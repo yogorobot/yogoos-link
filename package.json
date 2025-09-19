@@ -170,7 +170,7 @@
     "webpack-merge": "^6.0.1"
   },
   "build": {
-    "productName": "yolink",
+    "productName": "Yolink",
     "appId": "com.yogo.yolink",
     "asar": true,
     "afterSign": ".erb/scripts/notarize.js",
