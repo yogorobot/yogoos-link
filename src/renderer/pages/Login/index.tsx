@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useSSH, useFile } from '../../hooks';
 import { useToast } from '../../components/NotificationProvider';
-import icon from '../../../../assets/gemini_icon_node.svg';
+import icon from '../../../../assets/yolink_icon.svg';
 
 interface SSHCredentials {
   host: string;
