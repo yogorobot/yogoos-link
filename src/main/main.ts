@@ -60,8 +60,22 @@ app.on("window-all-closed", () => {
   log.info("所有窗口已关闭，清理资源...");
   cleanupAndExit();
 
+  // Windows/Linux 默认会退出应用。若当前正在切回登录窗口流程，避免立刻退出
   if (process.platform !== "darwin") {
-    app.quit();
+    if (!(windowManager as any).isCreatingLogin?.() && !windowManager.isCreatingLogin?.()) {
+      // 如果不是在创建登录页，但之前标记了要回到登录页，则立即重开
+      if ((windowManager as any).consumeReopenLoginRequest?.() || windowManager.consumeReopenLoginRequest?.()) {
+        log.info("所有窗口关闭，重新打开登录窗口");
+        // 某些情况下 window-all-closed 发生时 app 仍然 ready
+        if (app.isReady()) {
+          windowManager.createLoginWindow();
+          return; // 不退出
+        }
+      }
+      app.quit();
+    } else {
+      log.info("检测到登录窗口创建流程，暂不退出应用");
+    }
   }
 });
 

@@ -5,8 +5,7 @@
   "license": "MIT",
   "author": {
     "name": "YoLink Maintainers",
-    "email": "yuzhenquan@yogorobot.com",
-    "url": ""
+    "email": "yuzhenquan@yogorobot.com"
   },
   "main": "./dist/main/main.js",
   "scripts": {

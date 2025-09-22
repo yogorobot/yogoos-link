@@ -16,11 +16,28 @@ class WindowManager {
   public loginWindow: BrowserWindow = null;
   public mainWindow: BrowserWindow = null;
   public childWindows: Map<string, BrowserWindow> = new Map();
+  private isCreatingLoginWindow = false;
+  private reopenLoginAfterAllClosed = false;
+
+  public isCreatingLogin() {
+    return this.isCreatingLoginWindow;
+  }
+
+  public requestReopenLoginAfterAllClosed() {
+    this.reopenLoginAfterAllClosed = true;
+  }
+
+  public consumeReopenLoginRequest() {
+    const v = this.reopenLoginAfterAllClosed;
+    this.reopenLoginAfterAllClosed = false;
+    return v;
+  }
 
   async createLoginWindow(
     opt?: BrowserWindowConstructorOptions,
   ): Promise<BrowserWindow> {
     try {
+      this.isCreatingLoginWindow = true; // 标记正在创建登录窗口，避免 Windows 上被 window-all-closed 直接退出
       log.info('开始创建登录窗口...');
 
       // 先安全地关闭所有窗口
@@ -49,6 +66,8 @@ class WindowManager {
       log.info('执行应用退出');
       app.quit();
       throw error;
+    } finally {
+      this.isCreatingLoginWindow = false; // 重置标记
     }
   }
 
@@ -110,6 +129,9 @@ class WindowManager {
 
     this.mainWindow.on('close', (events) => {
       // console.log(`主窗口已关闭: ${id}`);
+
+      // 标记：关闭主窗口后需要回到登录页（用于 Windows 避免在 window-all-closed 直接退出）
+      this.requestReopenLoginAfterAllClosed();
 
       // 关闭所有隧道
       sshManager.closeAllTunnels();
@@ -214,6 +236,31 @@ class WindowManager {
     console.log(`安全尺寸: ${safeWidth}x${safeHeight}`);
     console.log(`计算位置: (${initialX}, ${initialY})`);
 
+    // 按平台设置标题栏策略
+    const isMac = process.platform === 'darwin';
+    const isWindows = process.platform === 'win32';
+
+    const platformOptions: BrowserWindowConstructorOptions = isMac
+      ? {
+          // macOS 使用隐藏的原生标题栏并保留 traffic lights
+          titleBarStyle: 'hiddenInset',
+        }
+      : isWindows
+        ? {
+            // Windows 使用标题栏覆盖，保留系统按键，同时允许前端自定义顶部背景与拖拽区域
+            // 需要在渲染层使用 `-webkit-app-region: drag` 的区域作为拖拽
+            titleBarOverlay: {
+              color: '#1e293b',
+              symbolColor: '#ffffff',
+              height: 40,
+            },
+            autoHideMenuBar: true,
+          }
+        : {
+            // Linux：保留系统标题栏，仅隐藏菜单栏
+            autoHideMenuBar: true,
+          };
+
     const win = new BrowserWindow(
       merge(
         {
@@ -224,10 +271,8 @@ class WindowManager {
           y: initialY,
           // resizable: false, // 由各个窗口类型自己决定
           // maximizable: false, // 禁止最大化
-          // titleBarStyle: 'hidden',
           // frame: false,
           backgroundColor: '#1e293b', // 使用深色背景而不是透明
-          titleBarStyle: 'hiddenInset', // 隐藏但保留控制按钮
           // 移除透明和毛玻璃效果，避免渲染残影问题
           // transparent: true,
           // vibrancy: 'fullscreen-ui',
@@ -247,6 +292,7 @@ class WindowManager {
               : path.join(__dirname, '../../.erb/dll/preload.js'),
           },
         },
+        platformOptions,
         options,
       ),
     );
