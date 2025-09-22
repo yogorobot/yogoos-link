@@ -10,11 +10,13 @@ const Index = () => {
   const [devToolsUrl, setDevToolsUrl] = useState(null);
 
   const handleCommandSubmit = async (event) => {
-    const formData = new FormData(event.target);
-    const formValues = Object.fromEntries(formData.entries());
     event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const formValues = Object.fromEntries(formData.entries());
+    const submitter = event.nativeEvent?.submitter;
 
-    if (event.nativeEvent?.submitter?.value === 'debug:connect') {
+    if (submitter?.value === 'debug:connect') {
       setIsExecuting(true);
       setLoading(true);
       try {
@@ -24,18 +26,16 @@ const Index = () => {
           showSuccess('调试连接成功');
         } else {
           const errorMsg = result.error || '调试连接失败';
-          console.error('Debug connect failed:', result);
           showError(`调试连接失败: ${errorMsg}`);
         }
         setIsExecuting(false);
         // setLoading(false);
       } catch (error) {
-        console.error('Error connecting to debug:', error);
         showError(`调试连接失败: ${error.message || '未知错误'}`);
         setIsExecuting(false);
         setLoading(false);
       }
-    } else if (event.nativeEvent?.submitter?.value === 'debug:disconnect') {
+    } else if (submitter?.value === 'debug:disconnect') {
       // 处理断开调试命令
       setIsExecuting(true);
       try {
@@ -47,7 +47,6 @@ const Index = () => {
           showError(result.error || '断开调试连接失败');
         }
       } catch (error) {
-        console.error('Error disconnecting debug:', error);
         showError(`断开调试连接失败: ${error.message || '未知错误'}`);
       } finally {
         setIsExecuting(false);
@@ -63,6 +62,7 @@ const Index = () => {
           <form
             action="#"
             className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4"
+            id="remote-debug-form"
             onSubmit={handleCommandSubmit}
           >
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2">
@@ -106,7 +106,6 @@ const Index = () => {
                 return (
                   <button
                     type="submit"
-                    // onClick={handleCommandSubmit}
                     disabled={isExecuting}
                     className="w-full lg:w-auto lg:flex-shrink-0 bg-indigo-600/80 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-xl transition-all whitespace-nowrap text-xs"
                   >
@@ -125,15 +124,7 @@ const Index = () => {
                   </button>
                 );
               }
-              return (
-                <button
-                  type="submit"
-                  value="debug:connect"
-                  className="w-full lg:w-auto lg:flex-shrink-0 bg-indigo-600/80 hover:bg-indigo-600 text-white px-4 py-1.5 rounded-xl transition-all whitespace-nowrap text-xs"
-                >
-                  开始调试
-                </button>
-              );
+              return null;
             })()}
           </form>
           {/* </div> */}
@@ -170,10 +161,19 @@ const Index = () => {
           }
 
           return (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-sm text-white/70">
+            <div className="flex flex-col items-center justify-center h-full">
+              <p className="text-sm text-white/70 mb-3">
                 未连接到调试服务, 请点击开始调试
               </p>
+              <button
+                type="submit"
+                form="remote-debug-form"
+                value="debug:connect"
+                disabled={isExecuting}
+                className="bg-indigo-600/80 hover:bg-indigo-600 text-white px-8 py-3 rounded-xl transition-all whitespace-nowrap text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                开始调试
+              </button>
             </div>
           );
         })()}

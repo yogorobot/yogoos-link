@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useSSH, useFile } from '../../hooks';
 import { useToast } from '../../components/NotificationProvider';
-import icon from '../../../../assets/yolink_icon.svg';
+// import icon from '../../../../assets/yolink_icon.svg';
 
 interface SSHCredentials {
   host: string;
@@ -304,7 +304,7 @@ const Index = () => {
               </div> */}
 
               {/* Text with clear separation */}
-              <h1 className="relative text-5xl font-black ml-4 italic transform -skew-x-12 drop-shadow-2xl overflow-hidden">
+              <h1 className="relative text-4xl font-black ml-4 italic transform -skew-x-12 drop-shadow-2xl overflow-hidden">
                 <span className="relative bg-gradient-to-r from-indigo-300 via-purple-200 to-cyan-300 bg-clip-text text-transparent">
                   YOLINK
                 </span>
