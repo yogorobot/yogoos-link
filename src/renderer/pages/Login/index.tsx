@@ -293,18 +293,18 @@ const Index = () => {
             />
 
             {/* Shared Background Plate */}
-            <div className="relative flex items-center h-20 bg-gray-900/80 rounded-full backdrop-blur-sm border border-white/10 shadow-2xl px-4">
+            <div className="relative flex items-center h-15 bg-gray-900/80 backdrop-blur-sm shadow-2xl px-4">
               {/* Icon */}
-              <div className="relative w-16 h-16 flex items-center justify-center">
+              {/* <div className="relative w-16 h-16 flex items-center justify-center">
                 <img
                   src={icon}
                   alt="App icon"
                   className="w-16 h-16 transition-transform duration-300 group-hover:scale-105"
                 />
-              </div>
+              </div> */}
 
               {/* Text with clear separation */}
-              <h1 className="relative text-4xl font-black ml-4 italic transform -skew-x-12 drop-shadow-2xl overflow-hidden">
+              <h1 className="relative text-5xl font-black ml-4 italic transform -skew-x-12 drop-shadow-2xl overflow-hidden">
                 <span className="relative bg-gradient-to-r from-indigo-300 via-purple-200 to-cyan-300 bg-clip-text text-transparent">
                   YOLINK
                 </span>
