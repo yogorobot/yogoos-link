@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/gemini_icon_node.svg" alt="YOLINK Logo" width="150" />
+  <img src="./assets/yolink_icon.svg" alt="YOLINK Logo" width="150" />
   <h1>YOLINK</h1>
   <p><strong>您的高级 SSH 工具套件</strong></p>
   <p>一款专为开发人员、系统管理员和 DevOps 专业人士设计的现代化、功能强大且直观的 SSH 客户端。</p>
