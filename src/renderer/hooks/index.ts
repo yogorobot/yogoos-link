@@ -5,5 +5,15 @@ import { useDebug } from './useDebug';
 import { useFile } from './useFile';
 import { useApp } from './useApp';
 import { useNotification } from './useNotification';
+import { useSystem } from './useSystem';
 
-export { useWindow, useLog, useSSH, useDebug, useFile, useApp, useNotification };
+export {
+  useWindow,
+  useLog,
+  useSSH,
+  useDebug,
+  useFile,
+  useApp,
+  useNotification,
+  useSystem,
+};

@@ -23,16 +23,20 @@ const setFilePermissions = (filePath: string) => `sudo chmod 666 ${filePath}`;
 
 class AppSwitcher {
   private options: IAppSwitcherOptions;
-  private switchAppWindow: BrowserWindow;
+  private window: BrowserWindow;
 
-  constructor(options: IAppSwitcherOptions, switchAppWindow: BrowserWindow) {
+  constructor(options: IAppSwitcherOptions, windowId: number) {
     this.options = options;
-    this.switchAppWindow = switchAppWindow;
+    this.window = BrowserWindow.fromId(windowId) as BrowserWindow;
   }
 
   // 发送进度更新到渲染进程
   private sendProgress(progress: Partial<IUploadProgress>) {
-    this.switchAppWindow.webContents.send('app:switch-progress', progress);
+    if (this.window.isDestroyed()) {
+      log.warn('Window is destroyed, cannot send progress update');
+      return;
+    }
+    this.window.webContents.send('app:switch-progress', progress);
   }
 
   private async updateConfig(): Promise<void> {

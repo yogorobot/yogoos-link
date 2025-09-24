@@ -1,3 +1,4 @@
+const { notarize } = require('@electron/notarize');
 const { build } = require('../../package.json');
 
 exports.default = async function notarizeMacos(context) {
@@ -25,9 +26,6 @@ exports.default = async function notarizeMacos(context) {
   }
 
   const appName = context.packager.appInfo.productFilename;
-
-  // 使用动态 import 来加载 ES Module
-  const { notarize } = await import('@electron/notarize');
 
   await notarize({
     tool: 'notarytool',

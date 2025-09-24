@@ -30,12 +30,19 @@ const restartServices = () => {
 class Debug {
   private activeTunnelId: string | null = null;
   private retryTimer: NodeJS.Timeout | null = null;
+  window: BrowserWindow | null = null;
 
-  connect(windowId, formValues: IFormValues) {
-    const targetWindow = BrowserWindow.fromId(windowId);
+  constructor(windowId) {
+    this.window = BrowserWindow.fromId(windowId);
+    this.window?.on('closed', () => {
+      this.window = null;
+      this.cleanup();
+    });
+  }
 
+  connect(formValues: IFormValues) {
     // 验证窗口对象
-    if (!targetWindow) {
+    if (this.window === null || this.window.isDestroyed()) {
       return Promise.resolve(new ErrorResponse('无法获取目标窗口'));
     }
 
@@ -50,7 +57,7 @@ class Debug {
     const localPort = formValues['local-port'];
     const remotePort = formValues['remote-port'];
 
-    targetWindow.on('closed', () => {
+    this.window.on('closed', () => {
       this.retryTimer && clearTimeout(this.retryTimer);
       this.retryTimer = null;
       // 窗口关闭时自动关闭隧道
@@ -73,7 +80,7 @@ class Debug {
           });
 
           if (dialogRes.response === 0) {
-            await this.enableDebugConfig(windowId, formValues);
+            await this.enableDebugConfig(formValues);
           } else {
             // 用户选择取消，执行相应逻辑
             return resolve(new ErrorResponse('用户取消操作'));
@@ -209,10 +216,7 @@ class Debug {
     });
   }
 
-  async disconnect(windowId) {
-    // 处理断开连接逻辑
-    const targetWindow = BrowserWindow.fromId(windowId);
-
+  async disconnect() {
     try {
       // 使用 ssh2 API 关闭隧道
       if (this.activeTunnelId) {
@@ -226,16 +230,13 @@ class Debug {
       } else {
         console.log('没有活跃的隧道需要关闭');
       }
-
-      return new SuccessResponse('Disconnected successfully');
     } catch (error) {
       console.error('断开连接时出错:', error);
-      return new ErrorResponse(`断开连接失败: ${error.message}`);
     }
   }
 
-  private async enableDebugConfig(windowId, formValues): Promise<void> {
-    const targetWindow = BrowserWindow.fromId(windowId);
+  private async enableDebugConfig(formValues): Promise<void> {
+    // const targetWindow = BrowserWindow.fromId(windowId);
     // 处理调试连接逻辑
     const debuggingPort = formValues['remote-port'];
 
@@ -294,4 +295,4 @@ class Debug {
   }
 }
 
-export default new Debug();
+export default Debug;

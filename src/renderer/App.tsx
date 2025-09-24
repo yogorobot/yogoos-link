@@ -4,7 +4,7 @@ import {
   Routes,
   Route,
   // useNavigate,
-  // useLocation,
+  useLocation,
 } from 'react-router-dom';
 import RemoteDebug from './pages/RemoteDebug';
 import Login from './pages/Login';
@@ -13,12 +13,14 @@ import HistoryLog from './pages/HistoryLog';
 import RealTimeLog from './pages/RealTimeLog';
 import AppUpdate from './pages/AppUpdate';
 import AppSwitch from './pages/AppSwitch';
+import PackageManager from './pages/PackageManager';
 import { NotificationProvider } from './components/NotificationProvider';
+import TitleBar from './components/TitleBar';
 import './App.scss';
 
 function AppContent() {
   // const navigate = useNavigate();
-  // const location = useLocation();
+  const location = useLocation();
 
   // useEffect(() => {
   //   // 全局监听SSH错误事件
@@ -78,7 +80,9 @@ function AppContent() {
   return (
     <div className="w-full h-full bg-gray-900/85 overflow-hidden flex flex-col">
       {/* 为自定义标题栏预留空间 */}
-      <div className="h-10 flex-shrink-0" />
+      <div className="h-10 flex-shrink-0">
+        <TitleBar />
+      </div>
 
       <div className="flex-1 overflow-hidden">
         <Routes>
@@ -90,6 +94,7 @@ function AppContent() {
           <Route path="/remote-debug" element={<RemoteDebug />} />
           <Route path="/log-history-viewer" element={<HistoryLog />} />
           <Route path="/log-real-time-viewer" element={<RealTimeLog />} />
+          <Route path="/package-manager" element={<PackageManager />} />
         </Routes>
       </div>
     </div>

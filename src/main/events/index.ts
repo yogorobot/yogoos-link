@@ -1,12 +1,14 @@
-import { BrowserWindow, ipcMain, dialog, Notification } from "electron";
-import { info, error } from "electron-log";
-import log from "../core/log";
-import debug from "../core/debug";
-import { SSHCredentials } from "../managers/ssh";
-import { sshManager, windowManager } from "../managers";
-import { decodeBase64 } from "../util";
-import AppUpdater, { IAppUpdateOptions } from "../core/app-update";
-import AppSwitcher, { IAppSwitcherOptions } from "../core/switch-app";
+import { BrowserWindow, ipcMain, dialog, Notification } from 'electron';
+import { info, error } from 'electron-log';
+import Logs from '../core/log';
+import Debug from '../core/debug';
+import { SSHCredentials } from '../managers/ssh';
+import { sshManager, windowManager } from '../managers';
+import { decodeBase64, ErrorResponse, SuccessResponse } from '../util';
+import AppUpdater, { IAppUpdateOptions } from '../core/app-update';
+import AppSwitcher, { IAppSwitcherOptions } from '../core/switch-app';
+import Package from '../core/package';
+import System from '../core/system';
 
 class IPCEvents {
   constructor() {
@@ -17,73 +19,117 @@ class IPCEvents {
     this.registerFileEvents();
     this.registerAppEvents();
     this.registerNotificationEvents();
+    this.registerSystemEvents();
+    this.registerPackageEvents();
+  }
+
+  registerPackageEvents() {
+    ipcMain.handle('package:query', async () => {
+      const packageInstance = new Package();
+      return await packageInstance.queryPackages();
+    });
+
+    ipcMain.handle('package:clear', async (event, options) => {
+      const packageInstance = new Package();
+      return await packageInstance.clearPackages();
+    });
+  }
+
+  registerSystemEvents() {
+    ipcMain.handle('system:reboot', async (event) => {
+      const systemInstance = new System();
+      try {
+        info('系统重启请求');
+
+        // 获取当前窗口
+        const window = BrowserWindow.fromWebContents(event.sender);
+        if (!window) {
+          return new ErrorResponse('无法获取当前窗口');
+        }
+
+        // 显示确认对话框
+        const result = await dialog.showMessageBox(window, {
+          type: 'warning',
+          title: '系统重启确认',
+          message: '您确定要重启系统吗？',
+          detail: '系统重启后，所有未保存的工作将丢失，SSH连接也会断开。',
+          buttons: ['取消', '确认重启'],
+          defaultId: 0,
+          cancelId: 0,
+        });
+
+        // 用户取消操作
+        if (result.response === 0) {
+          info('用户取消系统重启操作');
+          return new ErrorResponse('用户取消操作');
+        }
+
+        // 用户确认重启
+        info('用户确认系统重启，正在执行重启命令');
+        await systemInstance.reboot();
+        return new SuccessResponse(null);
+      } catch (err) {
+        error('系统重启失败:', err);
+        return new ErrorResponse(
+          err instanceof Error ? err.message : '未知错误',
+        );
+      }
+    });
   }
 
   registerLogEvents() {
-    ipcMain.handle("log:get-history-list", async (event) => {
-      const logs = await log.getHistoryLogList();
+    let logInstance: Logs = null;
+    ipcMain.handle('log:get-history-list', async (event) => {
+      logInstance = new Logs(event.sender.id);
+      const logs = await logInstance.getHistoryLogList();
       return logs;
     });
 
-    ipcMain.handle("log:get-stream-realtime-file", async (event) => {
-      return await log.getStreamRealtimeFile();
+    ipcMain.handle('log:get-stream-realtime-file', async (event) => {
+      logInstance = new Logs(event.sender.id);
+      return await logInstance.getStreamRealtimeFile();
     });
 
-    ipcMain.handle("log:get-stream-realtime", async (event, options) => {
+    ipcMain.handle('log:get-stream-realtime', async (event, options) => {
       const windowId = event.sender.id;
-      return await log.getStreamRealtime(windowId, options);
+      logInstance = new Logs(windowId);
+      return await logInstance.getStreamRealtime(options);
     });
-    ipcMain.handle("log:get-stream-history", async (event, options) => {
+    ipcMain.handle('log:get-stream-history', async (event, options) => {
       const windowId = event.sender.id;
-      return await log.getStreamHistory(windowId, options);
+      logInstance = new Logs(windowId);
+      return await logInstance.getStreamHistory(options);
     });
 
-    ipcMain.handle("log:clear-stream", async (event, id) => {
-      info("清理日志流:", id);
-      await log.clearStream(id);
+    ipcMain.handle('log:clear-stream', async (event, id) => {
+      await logInstance.clearup();
     });
   }
 
   registerSSHEvents() {
     // SSH认证
     ipcMain.handle(
-      "ssh:authenticate",
+      'ssh:authenticate',
       async (event, credentials: SSHCredentials) => {
-        try {
-          info("SSH认证请求:", {
-            host: credentials.host,
-            username: credentials.username,
-          });
+        const result = await sshManager.authenticateSSH(credentials);
 
-          const result = await sshManager.authenticateSSH(credentials);
-
-          if (result.success) {
-            // 认证成功，创建主窗口并传递认证信息
-            windowManager.createMainWindow({
-              title: "",
-            });
-          }
-
-          return result;
-        } catch (err) {
-          error("SSH认证错误:", err);
-          return {
-            success: false,
-            error: err instanceof Error ? err.message : "未知错误",
-          };
+        if (result.success) {
+          windowManager.createMainWindow();
         }
+
+        return result;
       },
     );
 
     // 断开SSH连接
-    ipcMain.handle("ssh:disconnect", async (event) => {
+    ipcMain.handle('ssh:disconnect', async (event) => {
       windowManager.createLoginWindow();
     });
   }
 
   registerWindowEvents() {
     ipcMain.handle(
-      "window:set-size",
+      'window:set-size',
       async (event, { width, height, center = false }) => {
         const window = BrowserWindow.fromWebContents(event.sender);
         const display = windowManager.getDisplay();
@@ -139,7 +185,7 @@ class IPCEvents {
     );
 
     // 获取当前窗口的信息
-    ipcMain.handle("window:get-current-info", (event) => {
+    ipcMain.handle('window:get-current-info', (event) => {
       const window = BrowserWindow.fromWebContents(event.sender) as any;
       if (!window) return null;
 
@@ -154,29 +200,29 @@ class IPCEvents {
       };
     });
 
-    ipcMain.handle("window:minimize", (event, windowId) => {
+    ipcMain.handle('window:minimize', (event, windowId) => {
       const targetWindow = windowId
         ? BrowserWindow.fromId(windowId)
         : BrowserWindow.fromWebContents(event.sender);
       if (targetWindow && !targetWindow.isDestroyed()) {
         targetWindow.minimize();
-        return { success: true };
+        return new SuccessResponse(null);
       }
-      return { success: false, error: "Window not found" };
+      return new ErrorResponse('Window not found');
     });
 
-    ipcMain.handle("window:close", (event, windowId) => {
+    ipcMain.handle('window:close', (event, windowId) => {
       const targetWindow = windowId
         ? BrowserWindow.fromId(windowId)
         : BrowserWindow.fromWebContents(event.sender);
       if (targetWindow && !targetWindow.isDestroyed()) {
         targetWindow.close();
-        return { success: true };
+        return new SuccessResponse(null);
       }
-      return { success: false, error: "Window not found" };
+      return new ErrorResponse('Window not found');
     });
 
-    ipcMain.handle("window:toggle-maximize", (event, windowId) => {
+    ipcMain.handle('window:toggle-maximize', (event, windowId) => {
       const targetWindow = windowId
         ? BrowserWindow.fromId(windowId)
         : BrowserWindow.fromWebContents(event.sender);
@@ -186,12 +232,12 @@ class IPCEvents {
         } else {
           targetWindow.maximize();
         }
-        return { success: true, isMaximized: targetWindow.isMaximized() };
+        return new SuccessResponse({ isMaximized: targetWindow.isMaximized() });
       }
-      return { success: false, error: "Window not found" };
+      return new ErrorResponse('Window not found');
     });
 
-    ipcMain.handle("window:maximize", (event, windowId) => {
+    ipcMain.handle('window:maximize', (event, windowId) => {
       const targetWindow = windowId
         ? BrowserWindow.fromId(windowId)
         : BrowserWindow.fromWebContents(event.sender);
@@ -201,12 +247,12 @@ class IPCEvents {
         } else {
           targetWindow.maximize();
         }
-        return { success: true };
+        return new SuccessResponse(null);
       }
-      return { success: false, error: "Window not found" };
+      return new ErrorResponse('Window not found');
     });
 
-    ipcMain.handle("window:toggle-size", (event) => {
+    ipcMain.handle('window:toggle-size', (event) => {
       const targetWindow = BrowserWindow.fromWebContents(event.sender);
       if (targetWindow && !targetWindow.isDestroyed()) {
         // 获取屏幕信息
@@ -281,169 +327,135 @@ class IPCEvents {
           }
         }
 
-        return { success: true };
+        return new SuccessResponse(null);
       }
-      return { success: false, error: "Window not found" };
+      return new ErrorResponse('Window not found');
     });
 
-    ipcMain.handle("window:create", async (event, filePath, options) => {
+    ipcMain.handle('window:create', async (event, filePath, options) => {
       const window = await windowManager.createChildWindow(filePath, options);
       if (window) {
-        return { success: true };
+        return new SuccessResponse(null);
       }
 
-      return { success: false, error: "Failed to create window" };
+      return new ErrorResponse('Failed to create window');
     });
   }
 
   registerFileEvents() {
     // 文件选择对话框
-    ipcMain.handle("file:show-open-dialog", async (event, options) => {
+    ipcMain.handle('file:show-open-dialog', async (event, options) => {
       try {
         const window = BrowserWindow.fromWebContents(event.sender);
         const result = await dialog.showOpenDialog(window, {
-          title: "选择SSH私钥文件",
-          defaultPath: "~/.ssh",
-          properties: ["openFile", "showHiddenFiles"],
+          title: '选择SSH私钥文件',
+          defaultPath: '~/.ssh',
+          properties: ['openFile', 'showHiddenFiles'],
           ...options,
         });
 
         if (result.canceled) {
-          return { success: false, canceled: true };
+          return new ErrorResponse('用户取消选择');
         }
 
-        return {
-          success: true,
-          filePath: result.filePaths[0],
-        };
+        return new SuccessResponse({ filePath: result.filePaths[0] });
       } catch (err) {
-        error("文件选择对话框错误:", err);
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "未知错误",
-        };
+        error('文件选择对话框错误:', err);
+        return new ErrorResponse(
+          err instanceof Error ? err.message : '未知错误',
+        );
       }
     });
   }
 
   registerDebugEvents() {
-    ipcMain.handle("debug:connect", async (event, formValues) => {
+    let debugInstance: Debug = null;
+    ipcMain.handle('debug:connect', async (event, formValues) => {
+      debugInstance = new Debug(event.sender.id);
       try {
-        const result = await debug.connect(event.sender.id, formValues);
+        const result = await debugInstance?.connect(formValues);
         return result;
       } catch (err) {
-        error("调试连接失败:", err);
+        error('调试连接失败:', err);
 
         // 确保错误对象能够正确序列化
-        if (err && typeof err === "object" && err.success === false) {
+        if (err && typeof err === 'object' && err.success === false) {
           // 如果是 ErrorResponse 对象，直接返回
-          return {
-            success: false,
-            error: err.error || "调试连接失败",
-            data: null,
-          };
+          return new ErrorResponse(err.error || '调试连接失败');
         }
 
         // 其他类型的错误
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "调试连接失败",
-          data: null,
-        };
+        return new ErrorResponse(
+          err instanceof Error ? err.message : '调试连接失败',
+        );
       }
     });
 
-    ipcMain.handle("debug:disconnect", async (event, formValues) => {
+    ipcMain.handle('debug:disconnect', async () => {
       try {
-        const result = await debug.disconnect(event.sender.id);
+        const result = await debugInstance?.disconnect();
         return result;
       } catch (err) {
-        error("断开调试连接失败:", err);
+        error('断开调试连接失败:', err);
 
         // 确保错误对象能够正确序列化
-        if (err && typeof err === "object" && err.success === false) {
-          return {
-            success: false,
-            error: err.error || "断开调试连接失败",
-            data: null,
-          };
+        if (err && typeof err === 'object' && err.success === false) {
+          return new ErrorResponse(err.error || '断开调试连接失败');
         }
 
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "断开调试连接失败",
-          data: null,
-        };
+        return new ErrorResponse(
+          err instanceof Error ? err.message : '断开调试连接失败',
+        );
       }
     });
   }
 
   registerAppEvents() {
     // 应用更新开始
-    ipcMain.handle("app:update", async (event, options: IAppUpdateOptions) => {
+    ipcMain.handle('app:update', async (event, options: IAppUpdateOptions) => {
       try {
-        const updateWindow = BrowserWindow.fromWebContents(event.sender);
-        if (!updateWindow) {
-          throw new Error("无法获取更新窗口");
-        }
-
-        const updater = new AppUpdater(options, updateWindow);
+        const updater = new AppUpdater(options, event.sender.id);
         await updater.performUpdate();
 
-        return { success: true };
+        return new SuccessResponse(null);
       } catch (err) {
-        error("应用更新失败:", err);
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "未知错误",
-        };
+        error('应用更新失败:', err);
+        return new ErrorResponse(
+          err instanceof Error ? err.message : '未知错误',
+        );
       }
     });
 
     ipcMain.handle(
-      "app:switch",
+      'app:switch',
       async (event, options: IAppSwitcherOptions) => {
         try {
-          const switchWindow = BrowserWindow.fromWebContents(event.sender);
-          if (!switchWindow) {
-            throw new Error("无法获取切换窗口");
-          }
-
-          const switcher = new AppSwitcher(options, switchWindow);
+          const switcher = new AppSwitcher(options, event.sender.id);
           await switcher.switchApp();
 
-          return { success: true };
+          return new SuccessResponse(null);
         } catch (err) {
-          error("应用切换失败:", err);
-          return {
-            success: false,
-            error: err instanceof Error ? err.message : "未知错误",
-          };
+          error('应用切换失败:', err);
+          return new ErrorResponse(
+            err instanceof Error ? err.message : '未知错误',
+          );
         }
       },
     );
 
     ipcMain.handle(
-      "app:get-current-app",
+      'app:get-current-app',
       async (event, options: IAppSwitcherOptions) => {
         try {
-          const switchWindow = BrowserWindow.fromWebContents(event.sender);
-          if (!switchWindow) {
-            throw new Error("无法获取切换窗口");
-          }
-
-          const switcher = new AppSwitcher(options, switchWindow);
+          const switcher = new AppSwitcher(options, event.sender.id);
           const currentApp = await switcher.getCurrentApp();
 
-          console.log(currentApp);
-
-          return { success: true, currentApp };
+          return new SuccessResponse({ currentApp });
         } catch (err) {
-          error("应用切换失败:", err);
-          return {
-            success: false,
-            error: err instanceof Error ? err.message : "未知错误",
-          };
+          error('获取当前应用失败:', err);
+          return new ErrorResponse(
+            err instanceof Error ? err.message : '未知错误',
+          );
         }
       },
     );
@@ -451,20 +463,17 @@ class IPCEvents {
 
   registerNotificationEvents() {
     // 显示系统通知
-    ipcMain.handle("notification:show", async (event, options) => {
+    ipcMain.handle('notification:show', async (event, options) => {
       try {
-        const { title, body, type = "info", silent = false } = options;
+        const { title, body, type = 'info', silent = false } = options;
 
         // 检查系统是否支持通知
         if (!Notification.isSupported()) {
-          return {
-            success: false,
-            error: "系统不支持通知功能",
-          };
+          return new ErrorResponse('系统不支持通知功能');
         }
 
         const notification = new Notification({
-          title: title || "SSH Inspector",
+          title: title || 'SSH Inspector',
           body,
           silent,
           icon: undefined, // 可以根据需要设置应用图标路径
@@ -473,33 +482,27 @@ class IPCEvents {
         // 显示通知
         notification.show();
 
-        info("系统通知已显示:", { title, body, type });
+        info('系统通知已显示:', { title, body, type });
 
-        return {
-          success: true,
-        };
+        return new SuccessResponse(null);
       } catch (err) {
-        error("显示系统通知失败:", err);
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "未知错误",
-        };
+        error('显示系统通知失败:', err);
+        return new ErrorResponse(
+          err instanceof Error ? err.message : '未知错误',
+        );
       }
     });
 
     // 检查通知权限
-    ipcMain.handle("notification:check-permission", async () => {
+    ipcMain.handle('notification:check-permission', async () => {
       try {
-        return {
-          success: true,
+        return new SuccessResponse({
           supported: Notification.isSupported(),
-        };
+        });
       } catch (err) {
-        return {
-          success: false,
-          supported: false,
-          error: err instanceof Error ? err.message : "未知错误",
-        };
+        return new ErrorResponse(
+          err instanceof Error ? err.message : '未知错误',
+        );
       }
     });
   }

@@ -23,11 +23,11 @@ export interface IUploadProgress {
  */
 class AppUpdater {
   private options: IAppUpdateOptions;
-  private updateWindow: BrowserWindow;
+  private window: BrowserWindow;
 
-  constructor(options: IAppUpdateOptions, updateWindow: BrowserWindow) {
+  constructor(options: IAppUpdateOptions, windowId: number) {
     this.options = options;
-    this.updateWindow = updateWindow;
+    this.window = BrowserWindow.fromId(windowId) as BrowserWindow;
   }
 
   // 执行远程命令 - 统一错误处理
@@ -42,7 +42,11 @@ class AppUpdater {
 
   // 发送进度更新到渲染进程
   private sendProgress(progress: Partial<IUploadProgress>) {
-    this.updateWindow.webContents.send('app:update-progress', progress);
+    if (this.window.isDestroyed()) {
+      log.warn('Window is destroyed, cannot send progress update');
+      return;
+    }
+    this.window.webContents.send('app:update-progress', progress);
   }
 
   // 验证本地文件 - 精简版本
@@ -127,7 +131,8 @@ class AppUpdater {
             const now = Date.now();
 
             // 限制进度更新频率，避免过度更新UI
-            if (now - lastProgressTime > 500) { // 每500ms更新一次
+            if (now - lastProgressTime > 500) {
+              // 每500ms更新一次
               lastProgressTime = now;
 
               // 提高精度，保留1位小数
@@ -206,7 +211,9 @@ class AppUpdater {
         log.error(`上传尝试 ${retryCount} 失败:`, error);
 
         if (retryCount >= maxRetries) {
-          throw new Error(`上传失败，已重试 ${maxRetries} 次: ${error.message}`);
+          throw new Error(
+            `上传失败，已重试 ${maxRetries} 次: ${error.message}`,
+          );
         }
 
         // 等待后重试
@@ -216,7 +223,7 @@ class AppUpdater {
           percentage: 20,
         });
 
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒后重试
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // 等待2秒后重试
       }
     }
 
@@ -298,7 +305,7 @@ class AppUpdater {
       });
 
       // 错误对话框
-      await dialog.showMessageBox(this.updateWindow, {
+      await dialog.showMessageBox(this.window, {
         type: 'error',
         title: `更新失败`,
         message: `操作失败: ${errorMessage}`,

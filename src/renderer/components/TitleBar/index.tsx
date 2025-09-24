@@ -10,8 +10,6 @@ const TitleBar: React.FC<TitleBarProps> = ({ title, className = '' }) => {
   const { getCurrentWindowInfo } = useWindow();
   const [windowInfo, setWindowInfo] = useState<any>(null);
 
-  console.log(windowInfo);
-
   useEffect(() => {
     const updateWindowInfo = async () => {
       const info = await getCurrentWindowInfo();

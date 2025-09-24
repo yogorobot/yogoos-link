@@ -8,7 +8,7 @@ const root = createRoot(container);
 const Root = () => {
   return (
     <div className="flex flex-col w-full h-full">
-      <TitleBar />
+      {/* <TitleBar /> */}
       <App />
     </div>
   );

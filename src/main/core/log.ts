@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import { sshManager, windowManager } from '../managers';
+import { sshManager } from '../managers';
 
 const buildFilterCommand = (filters): string => {
   const commands: string[] = [];
@@ -53,6 +53,15 @@ const formatFileList = (result) => {
 
 class Logs {
   processMap: Map<string, () => void> = new Map();
+  window: BrowserWindow | null = null;
+
+  constructor(windowId: number) {
+    this.window = BrowserWindow.fromId(windowId);
+    this.window.on('closed', () => {
+      this.window = null;
+      this.clearup();
+    });
+  }
 
   async getStreamRealtimeFile() {
     const isExistsMeteorFile = await this.checkLogMeteorFile();
@@ -87,22 +96,23 @@ class Logs {
     return checkResult.trim() == 'exists';
   }
 
-  async clearStream(id) {
-    console.log('清理日志流:', id);
-    const stopProcess = this.processMap.get(id);
-    if (stopProcess) {
-      stopProcess();
-      this.processMap.delete(id);
-    }
+  async clearup() {
+    this.processMap.forEach((stopProcess, requestId) => {
+      console.log('清理日志流:', requestId);
+      if (stopProcess) {
+        stopProcess();
+        this.processMap.delete(requestId);
+      }
+    });
   }
 
-  async getStreamRealtime(windowId, options) {
-    const targetWindow = BrowserWindow.fromId(windowId);
+  async getStreamRealtime(options) {
+    // const targetWindow = BrowserWindow.fromId(windowId);
     const { sshConnection } = sshManager;
     const { fileName, requestId, filters } = options;
 
     // 检查窗口是否存在
-    if (!targetWindow || targetWindow.isDestroyed()) {
+    if (!this.window || this.window.isDestroyed()) {
       throw new Error('目标窗口不存在或已销毁');
     }
 
@@ -120,33 +130,27 @@ class Logs {
     console.log('实时日志命令:', command);
 
     // 检查窗口是否仍然存在
-    if (targetWindow && !targetWindow.isDestroyed()) {
-      targetWindow.webContents.send(`log:stream-start-${requestId}`);
+    if (this.window && !this.window.isDestroyed()) {
+      this.window.webContents.send(`log:stream-start-${requestId}`);
     }
     const stop = await sshManager.executePtyCommand(command, (data) => {
       // 处理实时日志数据
       // 检查窗口是否仍然存在
-      if (targetWindow && !targetWindow.isDestroyed()) {
-        targetWindow.webContents.send(`log:stream-data-${requestId}`, data);
+      if (this.window && !this.window.isDestroyed()) {
+        this.window.webContents.send(`log:stream-data-${requestId}`, data);
       }
     });
 
     this.processMap.set(requestId, stop);
-
-    targetWindow.on('close', () => {
-      this.clearStream(requestId);
-    });
-
-    return { success: true };
   }
 
-  async getStreamHistory(windowId, options) {
-    const targetWindow = BrowserWindow.fromId(windowId);
+  async getStreamHistory(options) {
+    // const targetWindow = BrowserWindow.fromId(windowId);
     const { sshConnection } = sshManager;
     const { fileName, requestId, filters } = options;
 
     // 检查窗口是否存在
-    if (!targetWindow || targetWindow.isDestroyed()) {
+    if (!this.window || this.window.isDestroyed()) {
       throw new Error('目标窗口不存在或已销毁');
     }
 
@@ -168,21 +172,15 @@ class Logs {
     const stop = await sshManager.executePtyCommand(command, (data) => {
       // 处理实时日志数据
       // 检查窗口是否仍然存在
-      if (targetWindow && !targetWindow.isDestroyed()) {
-        targetWindow.webContents.send(`log:stream-data-${requestId}`, data);
+      if (this.window && !this.window.isDestroyed()) {
+        this.window.webContents.send(`log:stream-data-${requestId}`, data);
       }
     });
 
     this.processMap.set(requestId, stop);
-
-    targetWindow.on('close', () => {
-      this.clearStream(requestId);
-    });
-
-    return { success: true };
   }
 }
 
-const logs = new Logs();
+// const logs = new Logs();
 
-export default logs;
+export default Logs;

@@ -45,20 +45,6 @@ export class SSHAuthManager {
   public sshConnection: Client = null;
   public sshCredentials: SSHCredentials = null;
 
-  // 添加连接检查相关属性
-  private connectionCheckTimer: NodeJS.Timeout | null = null;
-
-  /**
-   * 连接状态检查机制
-   *
-   * 为了解决突然断网时SSH连接无法及时检测到断开的问题，我们实现了双重保障机制：
-   * 1. SSH层面的keepalive：通过配置keepaliveInterval和keepaliveCountMax参数，
-   *    定期发送心跳包检测连接状态
-   * 2. 应用层面的连接检查：通过定时执行简单命令来验证连接是否仍然有效
-   *
-   * 当检测到连接断开时，会自动清理连接资源并返回登录界面
-   */
-  // 隐道管理
   private activeTunnels: Map<string, net.Server> = new Map();
   private tunnelCounter = 0;
   private tunnelStats: Map<
@@ -726,59 +712,6 @@ export class SSHAuthManager {
     }
 
     return result;
-  }
-
-  /**
-   * 检查隐道健康状态
-   * 通过尝试连接本地端口来验证隐道是否可用
-   * @param tunnelId 隐道ID
-   * @returns Response<string>
-   */
-  public async checkTunnelHealth(tunnelId: string): Promise<Response<string>> {
-    return new Promise((resolve) => {
-      const server = this.activeTunnels.get(tunnelId);
-
-      if (!server || !server.listening) {
-        return resolve(new ErrorResponse('隐道不存在或未监听'));
-      }
-
-      const address = server.address() as net.AddressInfo;
-      if (!address) {
-        log.warn(`无法获取隐道地址信息: ${tunnelId}`);
-        return resolve(new ErrorResponse('无法获取隐道地址信息'));
-      }
-
-      log.info(`检查隐道健康状态: ${address.address}:${address.port}`);
-
-      // 尝试连接本地端口来测试隐道
-      const testSocket = new net.Socket();
-      let resolved = false; // 防止重复resolve
-
-      const timeout = setTimeout(() => {
-        if (resolved) return;
-        resolved = true;
-        testSocket.destroy();
-        log.warn(`隐道健康检查超时: ${tunnelId}`);
-        resolve(new ErrorResponse('隐道健康检查超时'));
-      }, 5000);
-
-      testSocket.connect(address.port, address.address, () => {
-        if (resolved) return;
-        resolved = true;
-        clearTimeout(timeout);
-        testSocket.end();
-        log.info(`隐道健康检查成功: ${tunnelId}`);
-        resolve(new SuccessResponse('隐道健康检查成功'));
-      });
-
-      testSocket.on('error', (error) => {
-        if (resolved) return;
-        resolved = true;
-        clearTimeout(timeout);
-        log.warn(`隐道健康检查失败: ${tunnelId} - ${error.message}`);
-        resolve(new ErrorResponse(`隐道健康检查失败: ${error.message}`));
-      });
-    });
   }
 }
 
