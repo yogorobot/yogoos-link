@@ -167,7 +167,7 @@ const Index = () => {
             </div>
           </div>
 
-          {/* 手动升级 */}
+          {/* UI应用升级 */}
           <div className="group relative bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl p-6 border border-amber-500/20 hover:border-amber-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="relative z-10">
@@ -177,15 +177,15 @@ const Index = () => {
                 </div>
                 <div>
                   <h2 className="text-xl font-semibold text-white mb-1">
-                    手动升级
+                    UI应用升级
                   </h2>
                   <p className="text-amber-300/80 text-xs font-medium">
-                    系统更新
+                    页面更新
                   </p>
                 </div>
               </div>
               <p className="text-white/70 mb-6 text-sm leading-relaxed">
-                手动检查和执行系统升级，保持系统最新状态
+                保持UI应用最新状态
               </p>
               <button
                 type="button"
@@ -260,8 +260,8 @@ const Index = () => {
                 type="button"
                 onClick={() =>
                   openChildWindow('package-manager', {
-                    width: 700,
-                    height: 600,
+                    width: 500,
+                    height: 650,
                   })
                 }
                 disabled={!authInfo || isLoading}

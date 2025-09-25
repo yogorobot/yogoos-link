@@ -101,3 +101,8 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 } as IElectron);
+
+window.addEventListener('contextmenu', ev => {
+  // 阻止默认行为
+  ev.preventDefault();
+});

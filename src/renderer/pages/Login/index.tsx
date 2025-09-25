@@ -280,7 +280,16 @@ const Index = () => {
         />
       </div>
 
-      <header className="flex-shrink-0">
+      <header
+        className="flex-shrink-0"
+        style={
+          {
+            WebkitAppRegion: 'drag',
+            userSelect: 'none',
+            backdropFilter: 'blur(20px)',
+          } as React.CSSProperties
+        }
+      >
         <div className="relative text-center my-4">
           <div className="group relative inline-flex items-center justify-center p-1">
             {/* Unified Glow Effect for the whole component */}
@@ -354,7 +363,7 @@ const Index = () => {
                   value={credentials.host}
                   onChange={handleInputChange}
                   disabled={isLoading}
-                  placeholder="192.168.1.100 或 example.com"
+                  placeholder="请输入机器人编号"
                   required
                   className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400/60 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:bg-white/12 focus:shadow-lg focus:shadow-indigo-500/20 shadow-sm"
                 />
@@ -499,7 +508,7 @@ const Index = () => {
                 value={credentials.port}
                 onChange={handleInputChange}
                 disabled={isLoading}
-                placeholder="22"
+                placeholder="请输入端口号"
                 min="1"
                 max="65535"
                 required
@@ -534,7 +543,7 @@ const Index = () => {
                 value={credentials.username}
                 onChange={handleInputChange}
                 disabled={isLoading}
-                placeholder="yogo"
+                placeholder="请输入用户名"
                 required
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400/60 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:bg-white/12 focus:shadow-lg focus:shadow-indigo-500/20 shadow-sm"
               />
@@ -567,7 +576,7 @@ const Index = () => {
                 value={credentials.password}
                 onChange={handleInputChange}
                 disabled={isLoading}
-                placeholder="输入密码"
+                placeholder="请输入密码"
                 required
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400/60 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:bg-white/12 focus:shadow-lg focus:shadow-indigo-500/20 shadow-sm"
               />
@@ -578,8 +587,8 @@ const Index = () => {
           {/* 设置图标按钮 */}
           <button
             type="button"
+            disabled={isLoading}
             onClick={() => {
-              console.log('设置按钮被点击');
               // 打开设置时，将当前配置复制到临时状态
               setTempJumpHostSettings({
                 useJumpHost: credentials.useJumpHost,
@@ -728,7 +737,7 @@ const Index = () => {
                         tempJumpHostSettings.jumpHost ?? credentials.jumpHost
                       }
                       onChange={handleTempInputChange}
-                      placeholder="jump.example.com"
+                      placeholder="请输入跳板机地址"
                       required={
                         tempJumpHostSettings.useJumpHost ??
                         credentials.useJumpHost
@@ -749,7 +758,7 @@ const Index = () => {
                           tempJumpHostSettings.jumpPort ?? credentials.jumpPort
                         }
                         onChange={handleTempInputChange}
-                        placeholder="22"
+                        placeholder="请输入端口"
                         min="1"
                         max="65535"
                         className="w-full bg-white/8 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/60 focus:bg-white/12 transition-all backdrop-blur-sm"
@@ -768,7 +777,7 @@ const Index = () => {
                           credentials.jumpUsername
                         }
                         onChange={handleTempInputChange}
-                        placeholder="root"
+                        placeholder="请输入用户名"
                         required={
                           tempJumpHostSettings.useJumpHost ??
                           credentials.useJumpHost
@@ -791,7 +800,7 @@ const Index = () => {
                           (credentials.jumpKeyFilePath || '')
                         }
                         onChange={handleTempInputChange}
-                        placeholder="~/.ssh/id_rsa"
+                        placeholder="请选择SSH私钥文件"
                         className="flex-1 bg-white/8 border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/60 focus:bg-white/12 transition-all backdrop-blur-sm font-mono"
                       />
                       <button

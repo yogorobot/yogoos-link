@@ -16,45 +16,25 @@ class WindowManager {
   public loginWindow: BrowserWindow = null;
   public mainWindow: BrowserWindow = null;
   public childWindows: Map<string, BrowserWindow> = new Map();
-  private isCreatingLoginWindow = false;
-  private reopenLoginAfterAllClosed = false;
-
-  public isCreatingLogin() {
-    return this.isCreatingLoginWindow;
-  }
-
-  public requestReopenLoginAfterAllClosed() {
-    this.reopenLoginAfterAllClosed = true;
-  }
-
-  public consumeReopenLoginRequest() {
-    const v = this.reopenLoginAfterAllClosed;
-    this.reopenLoginAfterAllClosed = false;
-    return v;
-  }
 
   async createLoginWindow(
     opt?: BrowserWindowConstructorOptions,
   ): Promise<BrowserWindow> {
-    this.isCreatingLoginWindow = true;
-    try {
-      await this.closeAllWindows();
-      const isExistsWindow = this.getLoginWindow();
-      if (isExistsWindow) {
-        isExistsWindow.focus();
-        return isExistsWindow;
-      }
-      this.loginWindow = await this.createWindow('login', {
-        resizable: false,
-        width: 420,
-        height: 680,
-        ...opt,
-      });
-    } catch (error) {
-      log.error('创建登录窗口失败:', error);
-    } finally {
-      this.isCreatingLoginWindow = false;
+    await this.closeAllWindows();
+    const isExistsWindow = this.getLoginWindow();
+    if (isExistsWindow) {
+      isExistsWindow.focus();
+      return isExistsWindow;
     }
+    this.loginWindow = await this.createWindow('login', {
+      resizable: false,
+      width: 400,
+      height: 620,
+      titleBarStyle: 'hiddenInset',
+      ...opt,
+    });
+
+    return this.loginWindow;
   }
 
   async createMainWindow(
@@ -69,10 +49,9 @@ class WindowManager {
       resizable: true,
       ...opt,
     });
-    this.mainWindow.on('close', () => {
-      this.requestReopenLoginAfterAllClosed();
-      sshManager.removeConnection();
+    this.mainWindow.once('close', () => {
       this.closeAllWindows();
+      sshManager.removeConnection();
     });
 
     const loginWindow = this.getLoginWindow();
@@ -97,7 +76,7 @@ class WindowManager {
       ...opt,
     });
     this.childWindows.set(route, window);
-    window.on('close', () => {
+    window.once('close', () => {
       this.childWindows.delete(route);
       log.info(`子窗口已关闭: ${route}`);
     });
@@ -110,6 +89,17 @@ class WindowManager {
     return (
       screen.getDisplayNearestPoint(mousePosition) || screen.getPrimaryDisplay()
     );
+  }
+
+  getTitle() {
+    if (sshManager?.sshCredentials?.host) {
+      if (sshManager?.sshCredentials?.useJumpHost) {
+        return `${sshManager?.sshCredentials?.jumpHost} -> ${sshManager?.sshCredentials?.host}`;
+      }
+      return `${sshManager?.sshCredentials?.host}`;
+    }
+
+    return 'YOLINK';
   }
 
   private async createWindow(
@@ -128,9 +118,7 @@ class WindowManager {
       display.bounds.y + Math.floor((display.bounds.height - height) / 2);
 
     const platformOptions: BrowserWindowConstructorOptions =
-      process.platform === 'darwin'
-        ? { titleBarStyle: 'hiddenInset' }
-        : { autoHideMenuBar: true };
+      process.platform === 'darwin' ? {} : { autoHideMenuBar: true };
 
     const win = new BrowserWindow(
       merge(
@@ -140,6 +128,7 @@ class WindowManager {
           x,
           y,
           backgroundColor: '#1e293b',
+          title: this.getTitle(),
           webPreferences: {
             preload: app.isPackaged
               ? path.join(__dirname, 'preload.js')
@@ -203,7 +192,6 @@ class WindowManager {
     windows.forEach((win) => {
       try {
         if (win) {
-          win.removeAllListeners('close');
           win.close();
         }
       } catch (error) {
@@ -220,7 +208,6 @@ class WindowManager {
     windows.forEach((win) => {
       try {
         if (win) {
-          win.removeAllListeners('close');
           win.close();
         }
       } catch (error) {

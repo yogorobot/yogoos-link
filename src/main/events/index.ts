@@ -46,14 +46,23 @@ const getInstance = <T>(map: Map<number, T>, event: IpcMainInvokeEvent) =>
   map.get(event.sender.id);
 
 class IPCEventsV2 {
-  logInstances: Map<number, Logs>= new Map<number, Logs>();
-  debugInstances: Map<number, Debug>= new Map<number, Debug>();
-  packageInstances: Map<number, Package>= new Map<number, Package>();
-  systemInstances: Map<number, System>= new Map<number, System>();
-  fileManagerInstances: Map<number, FileManager>= new Map<number, FileManager>();
-  notificationManagerInstances: Map<number, NotificationManager>= new Map<number, NotificationManager>();
-  windowInstances: Map<number, Window>= new Map<number, Window>();
-  appSwitcherInstances: Map<number, AppSwitcher> = new Map<number, AppSwitcher>();
+  logInstances: Map<number, Logs> = new Map<number, Logs>();
+  debugInstances: Map<number, Debug> = new Map<number, Debug>();
+  packageInstances: Map<number, Package> = new Map<number, Package>();
+  systemInstances: Map<number, System> = new Map<number, System>();
+  fileManagerInstances: Map<number, FileManager> = new Map<
+    number,
+    FileManager
+  >();
+  notificationManagerInstances: Map<number, NotificationManager> = new Map<
+    number,
+    NotificationManager
+  >();
+  windowInstances: Map<number, Window> = new Map<number, Window>();
+  appSwitcherInstances: Map<number, AppSwitcher> = new Map<
+    number,
+    AppSwitcher
+  >();
   appUpdaterInstances: Map<number, AppUpdater> = new Map<number, AppUpdater>();
 
   constructor() {
@@ -150,7 +159,9 @@ class IPCEventsV2 {
     });
 
     ipcMain.handle('log:clear-stream', (event) => {
-      return getInstance(this.logInstances, event)?.cleanup() ?? Promise.resolve();
+      return (
+        getInstance(this.logInstances, event)?.cleanup() ?? Promise.resolve()
+      );
     });
   }
 
@@ -166,8 +177,9 @@ class IPCEventsV2 {
       },
     );
 
-    ipcMain.handle('ssh:disconnect', () => {
-      windowManager.createLoginWindow();
+    ipcMain.handle('ssh:disconnect', (event) => {
+      const win = BrowserWindow.fromId(event.sender.id);
+      win.close();
     });
   }
 

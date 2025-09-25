@@ -225,21 +225,21 @@ const Index = () => {
             {/* 背景光晕 */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-3xl font-bold bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 bg-clip-text blur-3xl">
-                应用升级工具
+                UI应用升级工具
               </div>
             </div>
 
             {/* 主标题 */}
             <h1 className="relative text-2xl font-black mb-2 italic transform -skew-x-6 drop-shadow-2xl overflow-hidden">
               <span className="relative bg-gradient-to-r from-indigo-300 via-purple-200 to-cyan-300 bg-clip-text text-transparent">
-                🚀 应用升级工具
+                🚀 UI应用升级工具
                 {/* 灯光扫射效果 */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 animate-[sweep_3s_ease-in-out_infinite] transform skew-x-6 w-full">
                   <div className="w-full h-full bg-gradient-to-r from-transparent via-white/60 to-transparent blur-sm" />
                 </div>
                 {/* 额外发光层 */}
                 <div className="absolute inset-0 text-2xl font-black bg-gradient-to-r from-white/20 via-white/40 to-white/20 bg-clip-text text-transparent animate-pulse">
-                  🚀 应用升级工具
+                  🚀 UI应用升级工具
                 </div>
               </span>
             </h1>
@@ -451,7 +451,7 @@ const Index = () => {
               ) : (
                 <div className="relative z-10 flex items-center gap-2">
                   <span>🚀</span>
-                  <span>开始应用升级</span>
+                  <span>开始UI应用升级</span>
                 </div>
               )}
             </button>

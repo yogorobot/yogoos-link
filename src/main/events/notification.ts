@@ -19,7 +19,7 @@ class NotificationManager {
       }
 
       const notification = new Notification({
-        title: title || 'SSH Inspector',
+        title: title || 'YOLINK',
         body,
         silent,
         icon: undefined,
