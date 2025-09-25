@@ -34,35 +34,16 @@ class Debug {
 
   constructor(windowId) {
     this.window = BrowserWindow.fromId(windowId);
-    this.window?.on('closed', () => {
+    this.window?.once('closed', () => {
       this.window = null;
       this.cleanup();
     });
   }
 
   connect(formValues: IFormValues) {
-    // 验证窗口对象
-    if (this.window === null || this.window.isDestroyed()) {
-      return Promise.resolve(new ErrorResponse('无法获取目标窗口'));
-    }
-
-    // 验证SSH连接
-    if (!sshManager.sshConnection) {
-      return Promise.resolve(
-        new ErrorResponse('SSH连接未建立，请先建立SSH连接'),
-      );
-    }
-
     // 处理调试连接逻辑
     const localPort = formValues['local-port'];
     const remotePort = formValues['remote-port'];
-
-    this.window.on('closed', () => {
-      this.retryTimer && clearTimeout(this.retryTimer);
-      this.retryTimer = null;
-      // 窗口关闭时自动关闭隧道
-      this.cleanup();
-    });
 
     return new Promise(async (resolve, reject) => {
       try {
@@ -142,97 +123,87 @@ class Debug {
           return resolve(new ErrorResponse('SSH隧道建立失败'));
         }
 
-        const url = `http://localhost:${localPort}`;
+        // 调用新的checkUrl方法
+        const result = await this.checkUrl(localPort);
 
-        const checkUrl = async () => {
-          let retryCount = 0;
-          const maxRetries = 30; // 最大重试30次，约30秒
+        console.log(result);
 
-          const attemptConnection = async (): Promise<boolean> => {
-            try {
-              retryCount++;
-
-              // 使用AbortController实现超时控制
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
-
-              try {
-                // 使用单个fetch请求代替http.get + fetch的组合
-                const response = await fetch(
-                  `http://localhost:${localPort}/json/list?t=${Date.now()}`,
-                  {
-                    method: 'GET',
-                    signal: controller.signal,
-                  },
-                );
-
-                clearTimeout(timeoutId);
-
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data && data.length > 0) {
-                    console.log(`调试服务连接成功，尝试次数: ${retryCount}`);
-                    resolve(
-                      new SuccessResponse(url + data[0].devtoolsFrontendUrl),
-                    );
-                    return true;
-                  }
-                }
-              } catch (fetchError) {
-                clearTimeout(timeoutId);
-                throw fetchError;
-              }
-            } catch (error) {
-              console.log(
-                `连接尝试 ${retryCount}/${maxRetries} 失败:`,
-                error.message,
-              );
-            }
-
-            if (retryCount >= maxRetries) {
-              resolve(
-                new ErrorResponse(`调试服务连接超时，已尝试${maxRetries}次`),
-              );
-              return true;
-            }
-
-            return false;
-          };
-
-          const retry = async () => {
-            const done = await attemptConnection();
-            if (!done) {
-              this.retryTimer = setTimeout(retry, 1000);
-            }
-          };
-
-          retry();
-        };
-
-        checkUrl();
+        resolve(result);
       } catch (error) {
         resolve(new ErrorResponse(error.message || '未知错误'));
       }
     });
   }
 
-  async disconnect() {
-    try {
-      // 使用 ssh2 API 关闭隧道
-      if (this.activeTunnelId) {
-        const success = sshManager.closeTunnel(this.activeTunnelId);
-        if (success) {
-          console.log(`隧道已关闭: ${this.activeTunnelId}`);
-          this.activeTunnelId = null;
-        } else {
-          console.warn(`关闭隧道失败: ${this.activeTunnelId}`);
+  /**
+   * 检查调试URL是否可用
+   * @param localPort 本地端口
+   * @returns Promise<SuccessResponse<string> | ErrorResponse>
+   */
+  async checkUrl(
+    localPort: string,
+  ): Promise<SuccessResponse<string> | ErrorResponse> {
+    return new Promise((resolve) => {
+      let retryCount = 0;
+      const maxRetries = 30; // 最大重试30次，约30秒
+      const url = `http://localhost:${localPort}`;
+
+      const attemptConnection = async (): Promise<boolean> => {
+        try {
+          retryCount++;
+
+          // 使用AbortController实现超时控制
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+
+          try {
+            // 使用单个fetch请求代替http.get + fetch的组合
+            const response = await fetch(
+              `http://localhost:${localPort}/json/list?t=${Date.now()}`,
+              {
+                method: 'GET',
+                signal: controller.signal,
+              },
+            );
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+              const data = await response.json();
+              if (data && data.length > 0) {
+                console.log(`调试服务连接成功，尝试次数: ${retryCount}`);
+                resolve(new SuccessResponse(url + data[0].devtoolsFrontendUrl));
+                return true;
+              }
+            }
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            throw fetchError;
+          }
+        } catch (error) {
+          console.log(
+            `连接尝试 ${retryCount}/${maxRetries} 失败:`,
+            error.message,
+          );
         }
-      } else {
-        console.log('没有活跃的隧道需要关闭');
-      }
-    } catch (error) {
-      console.error('断开连接时出错:', error);
-    }
+
+        if (retryCount >= maxRetries) {
+          resolve(new ErrorResponse(`调试服务连接超时，已尝试${maxRetries}次`));
+          return true;
+        }
+
+        return false;
+      };
+
+      const retry = async () => {
+        const done = await attemptConnection();
+        if (!done) {
+          this.retryTimer = setTimeout(retry, 1000);
+        }
+      };
+
+      retry();
+    });
   }
 
   private async enableDebugConfig(formValues): Promise<void> {
@@ -250,31 +221,10 @@ class Debug {
   }
 
   /**
-   * 清理隧道资源
-   * 窗口关闭或应用退出时调用
-   */
-  private cleanupTunnel(): void {
-    if (this.activeTunnelId) {
-      try {
-        const success = sshManager.closeTunnel(this.activeTunnelId);
-        if (success) {
-          console.log(`窗口关闭，隧道已清理: ${this.activeTunnelId}`);
-        } else {
-          console.warn(`窗口关闭，隧道清理失败: ${this.activeTunnelId}`);
-        }
-      } catch (error) {
-        console.error(`窗口关闭，清理隧道时出错:`, error);
-      } finally {
-        this.activeTunnelId = null;
-      }
-    }
-  }
-
-  /**
    * 清理所有资源
    * 应用退出时调用
    */
-  public cleanup(): void {
+  public cleanup(): SuccessResponse<boolean> | ErrorResponse {
     // 清理重试定时器
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
@@ -283,15 +233,7 @@ class Debug {
     }
 
     // 清理隧道资源
-    this.cleanupTunnel();
-  }
-
-  /**
-   * 获取当前活跃的隧道ID
-   * @returns 隧道ID或null
-   */
-  public getActiveTunnelId(): string | null {
-    return this.activeTunnelId;
+    return sshManager.closeTunnel(this.activeTunnelId);
   }
 }
 

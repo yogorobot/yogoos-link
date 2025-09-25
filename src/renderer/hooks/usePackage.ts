@@ -7,8 +7,13 @@ export const usePackage = () => {
     return window.electron.ipcRenderer.invoke('package:clear');
   };
 
+  const packageClearSingle = (packageId: number) => {
+    return window.electron.ipcRenderer.invoke('package:clear-single', packageId);
+  };
+
   return {
     packageQuery,
     packageClear,
+    packageClearSingle,
   };
 };

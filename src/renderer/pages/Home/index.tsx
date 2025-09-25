@@ -13,8 +13,8 @@ const Index = () => {
 
   useEffect(() => {
     const fetchAuthInfo = async () => {
-      const info = await getCurrentWindowInfo();
-      setAuthInfo(info?.authInfo);
+      const { data } = await getCurrentWindowInfo();
+      setAuthInfo(data?.authInfo);
     };
 
     fetchAuthInfo();
@@ -74,41 +74,6 @@ const Index = () => {
         {/* 主要内容区域 */}
         {/* <div className=""> */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-          {/* 机器人包裹 */}
-          <div className="group relative bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 rounded-2xl p-6 border border-cyan-500/20 hover:border-cyan-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="relative z-10">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                  <span className="text-white text-xl">📦</span>
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-1">
-                    机器人包裹
-                  </h2>
-                  <p className="text-cyan-300/80 text-xs font-medium">
-                    查看/清空包裹
-                  </p>
-                </div>
-              </div>
-              <p className="text-white/70 mb-6 text-sm leading-relaxed">
-                查看机器人当前包裹内容，支持一键清空。
-              </p>
-              <button
-                type="button"
-                onClick={() =>
-                  openChildWindow('package-manager', {
-                    width: 700,
-                    height: 600,
-                  })
-                }
-                disabled={!authInfo || isLoading}
-                className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl transition-all text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
-              >
-                {isLoading ? '正在打开...' : '查看包裹'}
-              </button>
-            </div>
-          </div>
           {/* 实时日志查询 */}
           <div className="group relative bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 rounded-2xl p-6 border border-indigo-500/20 hover:border-indigo-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -271,6 +236,41 @@ const Index = () => {
               </button>
             </div>
           </div>
+          {/* 机器人包裹 */}
+          <div className="group relative bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 rounded-2xl p-6 border border-cyan-500/20 hover:border-cyan-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10 hover:-translate-y-1">
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="relative z-10">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
+                  <span className="text-white text-xl">📦</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-white mb-1">
+                    机器人包裹
+                  </h2>
+                  <p className="text-cyan-300/80 text-xs font-medium">
+                    查看/清空包裹
+                  </p>
+                </div>
+              </div>
+              <p className="text-white/70 mb-6 text-sm leading-relaxed">
+                查看机器人当前包裹内容，支持一键清空。
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  openChildWindow('package-manager', {
+                    width: 700,
+                    height: 600,
+                  })
+                }
+                disabled={!authInfo || isLoading}
+                className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl transition-all text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
+              >
+                {isLoading ? '正在打开...' : '查看包裹'}
+              </button>
+            </div>
+          </div>
 
           {/* 系统重启 */}
           <div className="group relative bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-2xl p-6 border border-red-500/20 hover:border-red-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-1">
@@ -338,7 +338,7 @@ const Index = () => {
               }}
               className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-2 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] text-sm font-medium"
             >
-              <span className="text-lg">🔌</span>
+              <span className="text-sm">🔌</span>
               断开连接
             </button>
           </div>

@@ -57,9 +57,9 @@ class Logs {
 
   constructor(windowId: number) {
     this.window = BrowserWindow.fromId(windowId);
-    this.window.on('closed', () => {
+    this.window.once('closed', () => {
       this.window = null;
-      this.clearup();
+      this.cleanup();
     });
   }
 
@@ -96,7 +96,7 @@ class Logs {
     return checkResult.trim() == 'exists';
   }
 
-  async clearup() {
+  async cleanup() {
     this.processMap.forEach((stopProcess, requestId) => {
       console.log('清理日志流:', requestId);
       if (stopProcess) {
@@ -180,7 +180,5 @@ class Logs {
     this.processMap.set(requestId, stop);
   }
 }
-
-// const logs = new Logs();
 
 export default Logs;

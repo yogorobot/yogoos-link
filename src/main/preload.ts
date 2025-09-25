@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
 type SystemChannels = 'system:reboot' | 'system:shutdown';
-type PackageChannels = 'package:query' | 'package:clear';
+type PackageChannels = 'package:query' | 'package:clear' | 'package:clear-single';
 
 // 定义允许的 IPC 通道
 type WindowChannels =

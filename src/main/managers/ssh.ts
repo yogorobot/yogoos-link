@@ -612,11 +612,13 @@ export class SSHAuthManager {
    * @param tunnelId 道ID
    * @returns boolean
    */
-  public closeTunnel(tunnelId: string): boolean {
+  public closeTunnel(
+    tunnelId: string,
+  ): SuccessResponse<boolean> | ErrorResponse {
     const server = this.activeTunnels.get(tunnelId);
     if (!server) {
       log.warn(`遀道不存在: ${tunnelId}`);
-      return false;
+      return new ErrorResponse('遀道不存在');
     }
 
     try {
@@ -625,10 +627,10 @@ export class SSHAuthManager {
       });
       this.activeTunnels.delete(tunnelId);
       this.tunnelStats.delete(tunnelId); // 清理统计信息
-      return true;
+      return new SuccessResponse(true);
     } catch (error) {
       log.error(`关闭遀道失败: ${tunnelId}`, error);
-      return false;
+      return new ErrorResponse(`关闭遀道失败: ${error.message}`);
     }
   }
 

@@ -18,7 +18,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ title, className = '' }) => {
       }
     };
 
-    updateWindowInfo();
+    // updateWindowInfo();
     // const interval = setInterval(updateWindowInfo, 1000);
     // return () => clearInterval(interval);
   }, [getCurrentWindowInfo]);

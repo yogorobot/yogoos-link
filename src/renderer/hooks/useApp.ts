@@ -37,19 +37,11 @@ export const useApp = () => {
   // 开始应用更新
   const updateApp = useCallback(
     async (options: AppUpdateOptions): Promise<AppResult> => {
-      try {
-        const result = await window.electron.ipcRenderer.invoke(
-          'app:update',
-          options,
-        );
-        return result;
-      } catch (error) {
-        console.error('Failed to start app update:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : '未知错误',
-        };
-      }
+      const result = await window.electron.ipcRenderer.invoke(
+        'app:update',
+        options,
+      );
+      return result;
     },
     [],
   );

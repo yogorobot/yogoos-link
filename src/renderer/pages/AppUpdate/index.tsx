@@ -43,7 +43,7 @@ const Index = () => {
     if (isUpdating) return;
 
     try {
-      const result = await showOpenDialog({
+      const { data, success } = await showOpenDialog({
         title: '选择ZIP更新文件',
         filters: [
           { name: 'ZIP文件', extensions: ['zip'] },
@@ -52,13 +52,15 @@ const Index = () => {
         properties: ['openFile'],
       });
 
-      if (result.success && result.filePath) {
+      console.log('data', data);
+
+      if (success && data.filePath) {
         // 获取文件统计信息来验证文件
         const fs = window.require ? window.require('fs') : null;
         if (fs) {
           try {
-            const stats = fs.statSync(result.filePath);
-            const fileName = result.filePath.split('/').pop() || 'unknown.zip';
+            const stats = fs.statSync(data.filePath);
+            const fileName = data.filePath.split('/').pop() || 'unknown.zip';
 
             // 验证文件类型和大小
             if (!fileName.toLowerCase().endsWith('.zip')) {
@@ -80,20 +82,20 @@ const Index = () => {
               name: fileName,
               size: stats.size,
               type: 'application/zip',
-              path: result.filePath,
+              path: data.filePath,
             } as File & { path: string };
 
             setUploadFile(fileObj);
             setUpdateOptions((prev) => ({
               ...prev,
-              filePath: result.filePath,
+              filePath: data.filePath,
             }));
           } catch {
             showError('无法读取文件信息，请重新选择');
           }
         } else {
           // 后备方案：创建基本文件对象
-          const fileName = result.filePath.split('/').pop() || 'unknown.zip';
+          const fileName = data.filePath.split('/').pop() || 'unknown.zip';
 
           if (!fileName.toLowerCase().endsWith('.zip')) {
             showError('请选择ZIP文件');
@@ -104,11 +106,11 @@ const Index = () => {
             name: fileName,
             size: 0, // 未知大小
             type: 'application/zip',
-            path: result.filePath,
+            path: data.filePath,
           } as File & { path: string };
 
           setUploadFile(fileObj);
-          setUpdateOptions((prev) => ({ ...prev, filePath: result.filePath }));
+          setUpdateOptions((prev) => ({ ...prev, filePath: data.filePath }));
         }
       }
     } catch {
@@ -153,11 +155,7 @@ const Index = () => {
         filePath: updateOptions.filePath,
       };
 
-      const result = await updateApp(finalOptions);
-
-      if (!result.success) {
-        throw new Error(result.error || '更新操作失败');
-      }
+      await updateApp(finalOptions);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '未知错误';
       showError(`更新失败: ${errorMsg}`);

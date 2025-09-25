@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog } from 'electron';
 import log from 'electron-log';
 import { sshManager } from '../managers';
+import { ErrorResponse, SuccessResponse } from '../util';
 
 export interface IAppSwitcherOptions {
   selectedApp: string;
@@ -22,12 +23,14 @@ const configPath = '/srv/yogoos/config.json';
 const setFilePermissions = (filePath: string) => `sudo chmod 666 ${filePath}`;
 
 class AppSwitcher {
-  private options: IAppSwitcherOptions;
   private window: BrowserWindow;
 
-  constructor(options: IAppSwitcherOptions, windowId: number) {
-    this.options = options;
+  constructor(windowId: number) {
     this.window = BrowserWindow.fromId(windowId) as BrowserWindow;
+    this.window.once('closed', () => {
+      // 清理引用
+      this.window = null;
+    });
   }
 
   // 发送进度更新到渲染进程
@@ -39,8 +42,8 @@ class AppSwitcher {
     this.window.webContents.send('app:switch-progress', progress);
   }
 
-  private async updateConfig(): Promise<void> {
-    const appName = this.options.selectedApp;
+  private async updateConfig(options: IAppSwitcherOptions): Promise<void> {
+    const appName = options.selectedApp;
 
     if (!appName || !appName.trim()) {
       throw new Error('Application name cannot be empty');
@@ -83,9 +86,9 @@ class AppSwitcher {
     }
   }
 
-  public async switchApp(): Promise<void> {
+  public async switchApp(options: IAppSwitcherOptions): Promise<void> {
     try {
-      await this.updateConfig();
+      await this.updateConfig(options);
 
       this.sendProgress({
         percentage: 90,
@@ -112,16 +115,23 @@ class AppSwitcher {
     }
   }
 
-  public async getCurrentApp(): Promise<string | null> {
+  public async getCurrentApp(): Promise<
+    | SuccessResponse<{
+        currentApp: string;
+      }>
+    | ErrorResponse
+  > {
     try {
       const result = await sshManager.executeCommand(
         'cat /srv/yogoos/config.json',
       );
       const config = JSON.parse(result);
-      return config.singleAppId || null;
+
+      console.log(new SuccessResponse({ currentApp: config.singleAppId }));
+      return new SuccessResponse({ currentApp: config.singleAppId });
     } catch (error) {
       log.error('Failed to get current app:', error);
-      return null;
+      return new ErrorResponse('获取当前应用失败');
     }
   }
 }

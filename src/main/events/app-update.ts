@@ -22,12 +22,16 @@ export interface IUploadProgress {
  * 支持文件上传、解压、配置更新和服务重启
  */
 class AppUpdater {
-  private options: IAppUpdateOptions;
+  // private options: IAppUpdateOptions;
   private window: BrowserWindow;
 
-  constructor(options: IAppUpdateOptions, windowId: number) {
-    this.options = options;
+  constructor(windowId: number) {
+    // this.options = options;
     this.window = BrowserWindow.fromId(windowId) as BrowserWindow;
+    this.window.once('closed', () => {
+      // 清理引用
+      this.window = null;
+    });
   }
 
   // 执行远程命令 - 统一错误处理
@@ -50,13 +54,13 @@ class AppUpdater {
   }
 
   // 验证本地文件 - 精简版本
-  private validateFile(): void {
-    if (!fs.existsSync(this.options.filePath)) {
+  private validateFile(options: IAppUpdateOptions): void {
+    if (!fs.existsSync(options.filePath)) {
       throw new Error('文件不存在');
     }
 
-    const stats = fs.statSync(this.options.filePath);
-    if (!stats.isFile() || !this.options.filePath.endsWith('.zip')) {
+    const stats = fs.statSync(options.filePath);
+    if (!stats.isFile() || !options.filePath.endsWith('.zip')) {
       throw new Error('只支持ZIP文件');
     }
 
@@ -67,11 +71,11 @@ class AppUpdater {
   }
 
   // 使用ssh2 SFTP上传文件 - 增强版本，支持超时和重试
-  private async uploadFile(): Promise<string> {
-    const fileName = path.basename(this.options.filePath);
-    const targetDir = this.options.targetDirectory || '/srv/yogoos/apps/';
+  private async uploadFile(options: IAppUpdateOptions): Promise<string> {
+    const fileName = path.basename(options.filePath);
+    const targetDir = options.targetDirectory || '/srv/yogoos/apps/';
     const remotePath = `${targetDir}${fileName}`;
-    const stats = fs.statSync(this.options.filePath);
+    const stats = fs.statSync(options.filePath);
     const totalSize = stats.size;
 
     this.sendProgress({
@@ -119,7 +123,7 @@ class AppUpdater {
             return reject(new Error(`SFTP连接失败: ${err.message}`));
           }
 
-          const readStream = fs.createReadStream(this.options.filePath);
+          const readStream = fs.createReadStream(options.filePath);
           const writeStream = sftp.createWriteStream(remotePath);
 
           let transferred = 0;
@@ -231,7 +235,7 @@ class AppUpdater {
   }
 
   // 主要执行流程 - 精简的7步骤
-  public async performUpdate(): Promise<void> {
+  public async performUpdate(options: IAppUpdateOptions): Promise<void> {
     // const appName = this.options.selectedApp;
 
     try {
@@ -241,7 +245,7 @@ class AppUpdater {
         message: `验证文件...`,
         percentage: 5,
       });
-      this.validateFile();
+      this.validateFile(options);
 
       // 准备远程环境
       this.sendProgress({
@@ -250,7 +254,7 @@ class AppUpdater {
         percentage: 10,
       });
 
-      const targetDir = this.options.targetDirectory || '/srv/yogoos/apps/';
+      const targetDir = options.targetDirectory || '/srv/yogoos/apps/';
 
       // 准备目标目录（无需临时目录）
       await this.runCommand(
@@ -258,7 +262,7 @@ class AppUpdater {
       );
 
       // 上传文件
-      const remotePath = await this.uploadFile();
+      const remotePath = await this.uploadFile(options);
 
       // 解压文件
       if (remotePath) {
@@ -268,7 +272,7 @@ class AppUpdater {
           percentage: 75,
         });
 
-        const targetDir = this.options.targetDirectory || '/srv/yogoos/apps/';
+        const targetDir = options.targetDirectory || '/srv/yogoos/apps/';
         await this.runCommand(
           `unzip -o "${remotePath}" -d "${targetDir}" && rm -f "${remotePath}"`,
         );

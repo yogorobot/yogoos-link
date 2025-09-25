@@ -172,23 +172,24 @@ const Index = () => {
   const handleKeyFileSelect = async () => {
     try {
       // 使用Electron原生文件对话框，支持访问隐藏文件和目录
-      const result = await showOpenDialog({
+      const { data, success } = await showOpenDialog({
+        title: '选择SSH私钥文件',
         defaultPath: '~/.ssh',
         properties: ['openFile', 'showHiddenFiles'],
       });
 
-      if (result.success && result.filePath) {
+      if (success && data.filePath) {
         // 在设置模态框中时，更新临时状态
         if (showJumpHostSettings) {
           setTempJumpHostSettings((prev) => ({
             ...prev,
-            jumpKeyFilePath: result.filePath,
+            jumpKeyFilePath: data.filePath,
           }));
           showSuccess('SSH私钥文件选择成功');
         } else {
           setCredentials((prev) => ({
             ...prev,
-            jumpKeyFilePath: result.filePath,
+            jumpKeyFilePath: data.filePath,
           }));
           showSuccess('SSH私钥文件选择成功');
         }

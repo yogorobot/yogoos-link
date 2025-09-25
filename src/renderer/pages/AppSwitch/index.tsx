@@ -16,7 +16,7 @@ const Index = () => {
 
   useEffect(() => {
     const fetchCurrentApp = async () => {
-      const config = await getCurrentApp();
+      const { data: config } = await getCurrentApp();
 
       setSwitchOptions((prev) => ({
         ...prev,
