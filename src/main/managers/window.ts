@@ -93,7 +93,7 @@ class WindowManager {
       return isExistsWindow;
     }
     const window = await this.createWindow(route, {
-      resizable: true,
+      resizable: false,
       ...opt,
     });
     this.childWindows.set(route, window);
