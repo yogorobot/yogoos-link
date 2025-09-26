@@ -1,21 +1,30 @@
+import * as fs from 'fs';
 import {
   app,
   BrowserWindow,
   BrowserWindowConstructorOptions,
   shell,
   screen,
+  Tray,
+  Menu,
+  nativeImage,
 } from 'electron';
 import { merge } from 'lodash';
 import path from 'path';
 import log from 'electron-log';
-import { encodeBase64, resolveHtmlPath } from '../util';
+import { encodeBase64, resolveHtmlPath, getAssetPath } from '../util';
 import MenuBuilder from '../menu';
 import { sshManager } from '.';
+import System from '../events/system';
 
 class WindowManager {
   public loginWindow: BrowserWindow = null;
   public mainWindow: BrowserWindow = null;
   public childWindows: Map<string, BrowserWindow> = new Map();
+  private tray: Tray | null = null;
+  private isQuitting = false;
+
+  constructor() {}
 
   async createLoginWindow(
     opt?: BrowserWindowConstructorOptions,
@@ -49,17 +58,173 @@ class WindowManager {
       resizable: true,
       ...opt,
     });
-    this.mainWindow.once('close', () => {
-      this.closeAllWindows();
-      sshManager.removeConnection();
+
+    this.mainWindow.on('close', (event) => {
+      if (this.isQuitting) {
+        return; // Allow the window to be destroyed
+      }
+      event.preventDefault();
+      this.createTray(); // 在这里创建托盘图标
+      this.hideMainWindow();
+    });
+
+    this.mainWindow.on('closed', () => {
+      this.destroyTray();
     });
 
     const loginWindow = this.getLoginWindow();
     if (loginWindow) {
-      loginWindow?.close();
+      loginWindow.destroy();
     }
 
     return this.mainWindow;
+  }
+
+  private destroyTray() {
+    if (this.tray) {
+      this.tray.destroy();
+      this.tray = null;
+    }
+  }
+
+  createTray() {
+    if (this.tray) return;
+    const iconPath = getAssetPath('tray.png');
+    const image = nativeImage.createFromPath(iconPath);
+
+    try {
+      if (process.platform === 'darwin') {
+        // image.setTemplateImage(true);
+        this.tray = new Tray(image);
+      } else {
+        const resizedIcon = image.resize({ width: 16, height: 16 });
+        this.tray = new Tray(resizedIcon);
+      }
+    } catch (error) {
+      log.error(
+        '[Tray Debug] An unexpected error occurred during tray creation:',
+        error,
+      );
+      return;
+    }
+
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: '显示/隐藏应用',
+        click: () => this.toggleWindowVisibility(),
+      },
+      { type: 'separator' },
+      {
+        label: '实时日志',
+        click: () => this.createChildWindow('log-real-time-viewer'),
+      },
+      {
+        label: '历史日志',
+        click: () => this.createChildWindow('log-history-viewer'),
+      },
+      {
+        label: '远程调试',
+        click: () => this.createChildWindow('remote-debug'),
+      },
+      {
+        label: 'UI应用升级',
+        click: () =>
+          this.createChildWindow('app-update', { width: 500, height: 650 }),
+      },
+      {
+        label: '应用切换',
+        click: () =>
+          this.createChildWindow('app-switch', { width: 500, height: 850 }),
+      },
+      {
+        label: '机器人包裹',
+        click: () =>
+          this.createChildWindow('package-manager', {
+            width: 500,
+            height: 650,
+          }),
+      },
+      {
+        label: '系统重启',
+        click: async () => {
+          this.showDialogAndHandleWindow(async (window) => {
+            const systemEvents = new System(window.id);
+            await systemEvents.rebootWithConfirmation();
+          });
+        },
+      },
+
+      { type: 'separator' },
+      {
+        label: '断开连接',
+        click: () => sshManager.removeConnection(),
+      },
+      { type: 'separator' },
+      {
+        label: '退出应用',
+        click: () => {
+          this.isQuitting = true;
+          app.quit();
+        },
+      },
+    ]);
+
+    this.tray.setContextMenu(contextMenu);
+    this.tray.setToolTip('YOLINK');
+
+    this.tray.on('click', () => {
+      // 单击托盘图标时判断
+      // 如果主窗口已经显示，但没有获取焦点，则获取焦点
+      if (process.platform === 'darwin') {
+        if (!this.mainWindow?.isFocused()) {
+          this.focusMainWindow();
+        }
+      } else {
+        this.toggleWindowVisibility();
+      }
+    });
+  }
+
+  private async showDialogAndHandleWindow(
+    dialogAction: (window: BrowserWindow) => Promise<void>,
+  ) {
+    const wasVisible = this.mainWindow?.isVisible();
+    if (!wasVisible) {
+      this.showMainWindow();
+    }
+
+    if (this.mainWindow) {
+      await dialogAction(this.mainWindow);
+    }
+
+    if (!wasVisible) {
+      this.hideMainWindow();
+    }
+  }
+
+  hideMainWindow() {
+    this.mainWindow?.hide();
+  }
+
+  showMainWindow() {
+    this.mainWindow?.show();
+    this.destroyTray();
+  }
+
+  focusMainWindow() {
+    this.mainWindow?.focus();
+  }
+
+  toggleWindowVisibility() {
+    if (this.mainWindow?.isVisible()) {
+      this.hideMainWindow();
+    } else {
+      this.showMainWindow();
+    }
+  }
+
+  setQuitting(flag: boolean) {
+    this.isQuitting = flag;
   }
 
   async createChildWindow(
@@ -192,7 +357,7 @@ class WindowManager {
     windows.forEach((win) => {
       try {
         if (win) {
-          win.close();
+          win.destroy();
         }
       } catch (error) {
         log.warn(`关闭窗口失败:`, error);
@@ -208,7 +373,7 @@ class WindowManager {
     windows.forEach((win) => {
       try {
         if (win) {
-          win.close();
+          win.destroy();
         }
       } catch (error) {
         log.warn(`关闭子窗口失败:`, error);

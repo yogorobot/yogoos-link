@@ -326,14 +326,17 @@ const Index = () => {
             <button
               type="button"
               onClick={async () => {
-                try {
-                  await disconnect();
-                  // 强制登出会自动处理窗口跳转和清理
-                } catch (disconnectError) {
-                  // eslint-disable-next-line no-console
-                  console.error('断开连接错误:', disconnectError);
-                  // eslint-disable-next-line no-alert
-                  alert('断开连接失败');
+                // eslint-disable-next-line no-alert
+                if (window.confirm('您确定要断开连接吗？')) {
+                  try {
+                    await disconnect();
+                    // 强制登出会自动处理窗口跳转和清理
+                  } catch (disconnectError) {
+                    // eslint-disable-next-line no-console
+                    console.error('断开连接错误:', disconnectError);
+                    // eslint-disable-next-line no-alert
+                    alert('断开连接失败');
+                  }
                 }
               }}
               className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-2 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] text-sm font-medium"

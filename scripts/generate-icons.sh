@@ -76,6 +76,23 @@ for size in "${SIZES[@]}"; do
   esac
 done
 
+# Generate a 16x16 icon for general use (e.g., window icon)
+# Use rsvg-convert if available for better SVG fidelity.
+if [[ $HAS_RSVG -eq 1 ]]; then
+  # Render glyph at inner size, then extend to full size with transparent padding
+  rsvg-convert -w 14 -h 14 "$SVG" -o "$ROOT_DIR/assets/icons/16x16.png"
+  magick "$ROOT_DIR/assets/icons/16x16.png" \
+    -alpha on -background none -gravity center \
+    -extent 16x16 PNG32:"$ROOT_DIR/assets/icons/16x16.png"
+else
+  magick -density 1024 "$SVG" \
+    -background none \
+    -resize 14x14 \
+    -gravity center \
+    -extent 16x16 \
+    PNG32:"$ROOT_DIR/assets/icons/16x16.png"
+fi
+
 # Generate ICO (Windows)
 # Generate ICO using magick (IM7)
 magick \

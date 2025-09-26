@@ -1,7 +1,7 @@
 /* eslint import/prefer-default-export: off */
 import { URL } from 'url';
 import path from 'path';
-import { extend } from 'lodash';
+import { app } from 'electron';
 
 export function resolveHtmlPath(htmlFileName: string) {
   if (process.env.NODE_ENV === 'development') {
@@ -31,26 +31,35 @@ export function decodeBase64<T>(data: string): T {
   return JSON.parse(Buffer.from(data, 'base64').toString('utf-8')) as T;
 }
 
-export class Response<T> {
-  success: boolean;
-  error: string | null;
-  data: T | null;
 
-  constructor(success: boolean, error: string | null, data: T | null) {
-    this.success = success;
-    this.error = error;
-    this.data = data;
-  }
+export function getAssetPath(...paths: string[]): string {
+  const RESOURCES_PATH = app.isPackaged
+    ? path.join(process.resourcesPath, 'assets')
+    : path.join(app.getAppPath(), 'assets');
+
+  return path.join(RESOURCES_PATH, ...paths);
 }
 
-export class ErrorResponse extends Response<null> {
-  constructor(error: string | null) {
-    super(false, error, null);
+export class Response<T> {
+  success: boolean;
+  data: T | null;
+  error: string | null;
+
+  constructor(success: boolean, data: T | null, error: string | null) {
+    this.success = success;
+    this.data = data;
+    this.error = error;
   }
 }
 
 export class SuccessResponse<T> extends Response<T> {
   constructor(data: T) {
-    super(true, null, data);
+    super(true, data, null);
+  }
+}
+
+export class ErrorResponse extends Response<null> {
+  constructor(error: string) {
+    super(false, null, error);
   }
 }

@@ -4,7 +4,7 @@ import Debug from './debug';
 import Window from './window';
 import Logs from './logs';
 import System from './system';
-import { SSHCredentials } from '../managers/ssh';
+import ssh, { SSHCredentials } from '../managers/ssh';
 import { sshManager, windowManager } from '../managers';
 import { decodeBase64, ErrorResponse, SuccessResponse } from '../util';
 import AppUpdater, { IAppUpdateOptions } from './app-update';
@@ -178,8 +178,9 @@ class IPCEventsV2 {
     );
 
     ipcMain.handle('ssh:disconnect', (event) => {
-      const win = BrowserWindow.fromId(event.sender.id);
-      win.close();
+      sshManager.removeConnection();
+      // const win = BrowserWindow.fromId(event.sender.id);
+      // win.close();
     });
   }
 

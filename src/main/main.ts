@@ -31,6 +31,7 @@ app.on('window-all-closed', () => {
 // 应用退出前清理资源
 app.on('before-quit', () => {
   log.info('应用退出前清理资源...');
+  windowManager.setQuitting(true);
   cleanupAndExit();
 });
 
@@ -40,8 +41,16 @@ app
     new IPCEventsV2();
     windowManager.createLoginWindow();
     app.on('activate', () => {
-      const wins = BrowserWindow.getAllWindows();
-      if (wins.length === 0) windowManager.createLoginWindow();
+      // On macOS it's common to re-create a window in the app when the
+      // dock icon is clicked and there are no other windows open.
+      const mainWindow = windowManager.getMainWindow();
+      if (mainWindow) {
+        // If the main window exists (even if hidden), show it.
+        windowManager.showMainWindow();
+      } else if (BrowserWindow.getAllWindows().length === 0) {
+        // If no windows exist at all, create a new login window.
+        windowManager.createLoginWindow();
+      }
     });
   })
   .catch(console.log);
