@@ -279,7 +279,7 @@ const Index = () => {
           </div>
 
           {/* 设备存储 */}
-          {/* <div className="group relative bg-gradient-to-br from-sky-500/10 to-sky-600/5 rounded-2xl p-6 border border-sky-500/20 hover:border-sky-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-sky-500/10 hover:-translate-y-1">
+          <div className="group relative bg-gradient-to-br from-sky-500/10 to-sky-600/5 rounded-2xl p-6 border border-sky-500/20 hover:border-sky-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-sky-500/10 hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="relative z-10">
               <div className="flex items-center mb-4">
@@ -311,7 +311,7 @@ const Index = () => {
                 {isLoading ? '正在打开...' : '查看存储'}
               </button>
             </div>
-          </div> */}
+          </div>
 
           {/* 系统重启 */}
           <div className="group relative bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-2xl p-6 border border-red-500/20 hover:border-red-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-1">

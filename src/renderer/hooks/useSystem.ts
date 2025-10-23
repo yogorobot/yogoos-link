@@ -13,14 +13,9 @@ export const useSystem = () => {
     return window.electron.ipcRenderer.invoke('system:shutdown');
   }, []);
 
-  const clearCache = useCallback(() => {
-    return window.electron.ipcRenderer.invoke('system:clearCache');
-  }, []);
-
   return {
     getStorageInfo,
     systemReboot,
     systemShutdown,
-    clearCache,
   };
 };

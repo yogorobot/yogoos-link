@@ -1,11 +1,4 @@
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useLayoutEffect,
-  forwardRef,
-} from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSystem } from '../../hooks';
 
 // --- TYPE DEFINITIONS ---
@@ -21,14 +14,6 @@ interface StorageEntry {
 
 interface ProgressBarProps {
   value: number;
-}
-
-interface LogModalProps {
-  logContent: string;
-  isComplete: boolean;
-  isFinalizing: boolean;
-  onClose: () => void;
-  onScroll: () => void;
 }
 
 // --- HELPER FUNCTIONS ---
@@ -73,103 +58,14 @@ const ProgressBar = ({ value }: ProgressBarProps) => {
   );
 };
 
-const LogModal = forwardRef<HTMLPreElement, LogModalProps>(
-  ({ logContent, isComplete, isFinalizing, onClose, onScroll }, ref) => {
-    return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="w-full max-w-4xl h-[80vh] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col">
-          <h2 className="text-lg font-semibold p-4 border-b border-gray-700 text-white">
-            清理日志
-          </h2>
-          <pre
-            ref={ref}
-            onScroll={onScroll}
-            className="flex-1 p-4 overflow-y-auto font-mono text-sm text-gray-300 whitespace-pre-wrap"
-          >
-            {logContent}
-          </pre>
-          <div className="p-4 border-t border-gray-700 flex justify-end items-center">
-            {(() => {
-              if (isComplete) {
-                if (isFinalizing) {
-                  return (
-                    <div className="flex items-center gap-2 text-gray-400">
-                      <div className="w-4 h-4 border-2 border-dashed rounded-full animate-spin border-green-400" />
-                      <span>正在刷新数据...</span>
-                    </div>
-                  );
-                }
-                return (
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-                  >
-                    关闭
-                  </button>
-                );
-              }
-              return (
-                <div className="flex items-center gap-2 text-gray-400">
-                  <div className="w-4 h-4 border-2 border-dashed rounded-full animate-spin border-cyan-400" />
-                  <span>正在执行...</span>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      </div>
-    );
-  },
-);
-LogModal.displayName = 'LogModal';
-
 // --- MAIN COMPONENT ---
 const StorageViewer = () => {
   const [storageEntries, setStorageEntries] = useState<StorageEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isFormatting, setIsFormatting] = useState<boolean>(false);
-  const [formatLog, setFormatLog] = useState<string>('');
-  const [formatComplete, setFormatComplete] = useState<boolean>(false);
-  const [isFinalizing, setIsFinalizing] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { getStorageInfo, clearCache } = useSystem();
-  const logContainerRef = useRef<HTMLPreElement>(null);
+  const { getStorageInfo } = useSystem();
   const isInitialLoad = useRef(true);
-  const userScrolledUp = useRef(false);
-
-  // Listen for log stream
-  useEffect(() => {
-    const removeListener = window.electron.ipcRenderer.on(
-      'system:clear-cache-progress',
-      (logChunk) => {
-        setFormatLog((prevLog) => prevLog + (logChunk as string));
-      },
-    );
-    return () => {
-      removeListener();
-    };
-  }, []);
-
-  // Smart auto-scroll for the log
-  useLayoutEffect(() => {
-    const node = logContainerRef.current;
-    if (node && !userScrolledUp.current) {
-      node.scrollTop = node.scrollHeight;
-    }
-  }, [formatLog]);
-
-  const handleLogScroll = () => {
-    const node = logContainerRef.current;
-    if (node) {
-      const scrollThreshold = 10; // pixels
-      const isAtBottom =
-        node.scrollHeight - node.clientHeight <=
-        node.scrollTop + scrollThreshold;
-      userScrolledUp.current = !isAtBottom;
-    }
-  };
 
   const fetchStorageInfo = useCallback(async () => {
     if (isInitialLoad.current) {
@@ -204,73 +100,8 @@ const StorageViewer = () => {
     return () => clearInterval(intervalId);
   }, [fetchStorageInfo]);
 
-  const handleFormatStorage = async () => {
-    setFormatLog('');
-    setFormatComplete(false);
-    setIsFinalizing(false);
-    userScrolledUp.current = false;
-
-    let processConfirmed = false;
-
-    const removeConfirmListener = window.electron.ipcRenderer.on(
-      'system:clear-cache-confirmed',
-      () => {
-        processConfirmed = true;
-        setIsFormatting(true);
-      },
-    );
-
-    try {
-      const result = await clearCache();
-
-      // 添加 null 检查
-      if (!result) {
-        // eslint-disable-next-line no-console
-        console.warn('clearCache 返回 null/undefined');
-        return;
-      }
-
-      if (result.success) {
-        setFormatLog((prevLog) => `${prevLog}\n\n--- 成功 ---\n${result.data}`);
-      } else if (result.error !== '用户取消了操作') {
-        setFormatLog(
-          (prevLog) =>
-            `${prevLog}\n\n--- 操作失败 ---\n最终返回: ${result.error}`,
-        );
-      }
-    } catch (e) {
-      const errorMessage = `操作时发生异常: ${(e as Error).message}`;
-      if (processConfirmed) {
-        setFormatLog(
-          (prevLog) => `${prevLog}\n\n--- 异常 ---\n${errorMessage}`,
-        );
-      } else {
-        // eslint-disable-next-line no-alert
-        alert(errorMessage);
-      }
-    } finally {
-      removeConfirmListener();
-      if (processConfirmed) {
-        setFormatComplete(true);
-        setIsFinalizing(true);
-        await fetchStorageInfo();
-        setIsFinalizing(false);
-      }
-    }
-  };
-
   return (
     <div className="w-full h-screen bg-gray-900/90 text-white font-sans flex flex-col">
-      {isFormatting && (
-        <LogModal
-          ref={logContainerRef}
-          logContent={formatLog}
-          isComplete={formatComplete}
-          isFinalizing={isFinalizing}
-          onClose={() => setIsFormatting(false)}
-          onScroll={handleLogScroll}
-        />
-      )}
       {/* Fixed Header */}
       <div className="flex-shrink-0 bg-gray-900/80 backdrop-blur-sm border-b border-white/10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -366,14 +197,7 @@ const StorageViewer = () => {
       {/* Fixed Footer */}
       <div className="flex-shrink-0 bg-gray-900/80 backdrop-blur-sm border-t border-white/10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-center">
-          <button
-            type="button"
-            onClick={handleFormatStorage}
-            disabled={isFormatting}
-            className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] text-sm font-medium"
-          >
-            格式化存储卡
-          </button>
+          <span className="text-gray-400 text-sm">实时显示设备存储信息</span>
         </div>
       </div>
     </div>

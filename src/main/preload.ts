@@ -4,10 +4,7 @@ type SystemChannels =
   | 'system:reboot'
   | 'system:shutdown'
   | 'system:getStorageInfo'
-  | 'system:getServicesUsingTFCard'
-  | 'system:clearCache'
-  | 'system:clear-cache-progress'
-  | 'system:clear-cache-confirmed';
+  | 'system:getServicesUsingTFCard';
 type PackageChannels = 'package:query' | 'package:clear' | 'package:clear-single';
 
 // 定义允许的 IPC 通道

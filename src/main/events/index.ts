@@ -139,14 +139,6 @@ class IPCEventsV2 {
         System,
       ).getServicesUsingTFCard();
     });
-
-    ipcMain.handle('system:clearCache', async (event) => {
-      return await getOrCreateInstance(
-        this.systemInstances,
-        event.sender.id,
-        System,
-      ).clearCacheWithConfirmation();
-    });
   }
 
   registerLogEvents() {
