@@ -30,6 +30,7 @@ const Index = () => {
   const [requestId, setRequestId] = useState<string>(null);
   const [filters, setFilters] = useState<FilterOptions>(defaultFilters);
   const [time, setTime] = useState<number>(Date.now());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const onFilterChange = (filter: FilterOptions) => {
     setFilters(filter);
@@ -98,10 +99,14 @@ const Index = () => {
   return (
     <div className="w-full h-full bg-gray-900/85 backdrop-blur-xl flex">
       <div className="flex h-full w-full min-h-0">
-        {/* 左侧文件列表 */}
-        <div className="w-80 flex-shrink-0 bg-white/5 border-r border-white/10 flex flex-col h-full backdrop-blur-sm">
+        {/* 左侧文件列表 - 可折叠 */}
+        <div
+          className={`flex-shrink-0 bg-white/5 border-r border-white/10 flex flex-col h-full backdrop-blur-sm transition-all duration-300 ease-in-out overflow-hidden ${
+            sidebarCollapsed ? 'w-0' : 'w-80'
+          }`}
+        >
           {/* 头部标题 */}
-          <div className="p-4 border-b border-white/10 flex-shrink-0">
+          <div className="p-4 border-b border-white/10 flex-shrink-0 min-w-[320px]">
             <div className="text-center mb-3">
               <h2 className="text-xl font-semibold text-white mb-1">
                 历史日志
@@ -113,7 +118,7 @@ const Index = () => {
           </div>
 
           {/* 文件列表 */}
-          <div className="flex-1 overflow-y-auto p-3 min-h-0">
+          <div className="flex-1 overflow-y-auto p-3 min-h-0 min-w-[320px]">
             {(() => {
               if (isLoading) {
                 return (
@@ -234,6 +239,8 @@ const Index = () => {
               defaultFilters={defaultFilters}
               onFilterChange={onFilterChange}
               requestId={requestId}
+              sidebarCollapsed={sidebarCollapsed}
+              onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             />
           ) : (
             <div className="flex items-center justify-center h-full">

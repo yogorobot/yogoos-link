@@ -9,6 +9,8 @@ interface IProps {
   filters: FilterOptions;
   defaultFilters: FilterOptions;
   onFilterChange: (filters: FilterOptions) => void;
+  sidebarCollapsed?: boolean;
+  onSidebarToggle?: () => void;
 }
 
 const Index: FC<IProps> = ({
@@ -17,6 +19,8 @@ const Index: FC<IProps> = ({
   filters: propsFilters,
   defaultFilters,
   onFilterChange,
+  sidebarCollapsed,
+  onSidebarToggle,
 }) => {
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -110,6 +114,36 @@ const Index: FC<IProps> = ({
     <div className="relative w-full h-full flex flex-col bg-black text-white">
       {/* 搜索组件常驻顶部区域 */}
       <div className="flex-shrink-0 bg-gray-800 border-b border-gray-700 flex items-center">
+        {/* 折叠按钮 - 在最左侧 */}
+        <div className="flex-shrink-0 px-2">
+          {onSidebarToggle && (
+            <button
+              type="button"
+              onClick={onSidebarToggle}
+              className="text-white/60 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all duration-300"
+              title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+              aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+            >
+              <svg
+                className={`w-5 h-5 transition-all duration-300 ${
+                  sidebarCollapsed ? 'rotate-180' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* 搜索组件 - 中间扩展 */}
         <div className="flex-1">
           <SearchComponent
             searchText={searchText}
@@ -122,6 +156,7 @@ const Index: FC<IProps> = ({
           />
         </div>
 
+        {/* 过滤按钮 - 在最右侧 */}
         <div className="flex-shrink-0 px-3">
           <button
             type="button"
