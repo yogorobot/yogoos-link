@@ -10,6 +10,7 @@ import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { windowManager } from '.';
 
 export interface SSHCredentials {
   host: string;
@@ -218,10 +219,8 @@ export class SSHAuthManager {
     log.info('SSH resources cleaned up.');
 
     // Dynamically require to avoid circular dependencies
-    const { windowManager } = require('.');
     // Use setImmediate to allow the current call stack to clear before creating a new window.
     setImmediate(() => {
-      log.info('Requesting window manager to create login window.');
       windowManager.createLoginWindow();
     });
   }
@@ -247,6 +246,33 @@ export class SSHAuthManager {
           })
           .stderr.on('data', (data) => {
             log.error(`SSH command stderr: ${data}`);
+          });
+      });
+    });
+  }
+
+  public executeCommandWithStream(
+    command: string,
+    onData: (data: string) => void,
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      if (!this.sshConnection) {
+        return reject(new Error('SSH connection not established.'));
+      }
+      this.sshConnection.exec(command, (err, stream) => {
+        if (err) {
+          return reject(err);
+        }
+        stream
+          .on('close', (code: number) => {
+            log.info(`Command stream closed with code: ${code}`);
+            resolve(code);
+          })
+          .on('data', (data: Buffer) => {
+            onData(data.toString('utf-8'));
+          })
+          .stderr.on('data', (data: Buffer) => {
+            onData(data.toString('utf-8'));
           });
       });
     });

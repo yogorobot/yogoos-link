@@ -61,13 +61,13 @@ const Index = () => {
     setProgress(null);
 
     try {
-      const result = await switchApp({
+      const { success } = await switchApp({
         selectedApp: switchOptions.selectedApp,
       });
 
-      if (!result.success) {
+      if (!success) {
         setIsSwitching(false);
-        showError(result.error || '应用切换失败');
+        showError('应用切换失败');
       }
     } catch (error) {
       setIsSwitching(false);

@@ -86,7 +86,7 @@ class AppSwitcher {
     }
   }
 
-  public async switchApp(options: IAppSwitcherOptions): Promise<void> {
+  public async switchApp(options: IAppSwitcherOptions): Promise<SuccessResponse<void> | ErrorResponse> {
     try {
       await this.updateConfig(options);
 
@@ -104,6 +104,8 @@ class AppSwitcher {
         stage: 'completed',
         message: '应用切换完成',
       });
+
+      return new SuccessResponse(null);
     } catch (error) {
       log.error('App switch failed:', error);
       this.sendProgress({
@@ -111,7 +113,7 @@ class AppSwitcher {
         stage: 'error',
         message: `应用切换失败: ${error.message}`,
       });
-      dialog.showErrorBox('应用切换失败', error.message || '未知错误');
+      return new ErrorResponse(`应用切换失败: ${error.message}`);
     }
   }
 

@@ -96,7 +96,9 @@ const Index = () => {
               </p>
               <button
                 type="button"
-                onClick={() => openChildWindow('log-real-time-viewer')}
+                onClick={() =>
+                  openChildWindow('log-real-time-viewer', { resizable: true })
+                }
                 disabled={!authInfo || isLoading}
                 className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl transition-all text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
               >
@@ -127,7 +129,9 @@ const Index = () => {
               </p>
               <button
                 type="button"
-                onClick={() => openChildWindow('log-history-viewer')}
+                onClick={() =>
+                  openChildWindow('log-history-viewer', { resizable: true })
+                }
                 disabled={!authInfo || isLoading}
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl transition-all text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
               >
@@ -158,7 +162,9 @@ const Index = () => {
               </p>
               <button
                 type="button"
-                onClick={() => openChildWindow('remote-debug')}
+                onClick={() =>
+                  openChildWindow('remote-debug', { resizable: true })
+                }
                 disabled={!authInfo || isLoading}
                 className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl transition-all text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
               >
@@ -226,7 +232,7 @@ const Index = () => {
                 onClick={() =>
                   openChildWindow('app-switch', {
                     width: 500,
-                    height: 850,
+                    height: 750,
                   })
                 }
                 disabled={!authInfo || isLoading}
@@ -271,6 +277,41 @@ const Index = () => {
               </button>
             </div>
           </div>
+
+          {/* 设备存储 */}
+          {/* <div className="group relative bg-gradient-to-br from-sky-500/10 to-sky-600/5 rounded-2xl p-6 border border-sky-500/20 hover:border-sky-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-sky-500/10 hover:-translate-y-1">
+            <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="relative z-10">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-sky-500 to-sky-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
+                  <span className="text-white text-xl">💾</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-white mb-1">
+                    设备存储
+                  </h2>
+                  <p className="text-sky-300/80 text-xs font-medium">
+                    磁盘空间监控
+                  </p>
+                </div>
+              </div>
+              <p className="text-white/70 mb-6 text-sm leading-relaxed">
+                查看远程设备的磁盘使用情况和可用空间。
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  openChildWindow('storage-viewer', {
+                    height: 600,
+                  })
+                }
+                disabled={!authInfo || isLoading}
+                className="w-full bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl transition-all text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
+              >
+                {isLoading ? '正在打开...' : '查看存储'}
+              </button>
+            </div>
+          </div> */}
 
           {/* 系统重启 */}
           <div className="group relative bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-2xl p-6 border border-red-500/20 hover:border-red-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-1">

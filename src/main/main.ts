@@ -22,6 +22,12 @@ app.on('window-all-closed', () => {
   log.info('所有窗口已关闭，清理资源...');
   cleanupAndExit();
 
+  // // 在开发模式下，关闭窗口就退出应用
+  // if (process.env.NODE_ENV === 'development') {
+  //   app.quit();
+  //   return;
+  // }
+
   // Windows/Linux 默认会退出应用。若当前正在切回登录窗口流程，避免立刻退出
   if (process.platform !== 'darwin') {
     app.quit();

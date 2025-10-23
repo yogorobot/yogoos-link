@@ -55,7 +55,7 @@ class WindowManager {
       return isExistsWindow;
     }
     this.mainWindow = await this.createWindow('home', {
-      resizable: true,
+      resizable: false,
       ...opt,
     });
 
@@ -157,7 +157,9 @@ class WindowManager {
       { type: 'separator' },
       {
         label: '断开连接',
-        click: () => sshManager.removeConnection(),
+        click: () => {
+          sshManager.removeConnection();
+        },
       },
       { type: 'separator' },
       {
@@ -285,6 +287,17 @@ class WindowManager {
     const platformOptions: BrowserWindowConstructorOptions =
       process.platform === 'darwin' ? {} : { autoHideMenuBar: true };
 
+    // 如果设置了 resizable: false，自动设置 maximizable 和 fullscreenable 为 false
+    const finalOptions = { ...options };
+    if (finalOptions.resizable === false) {
+      if (finalOptions.maximizable === undefined) {
+        finalOptions.maximizable = false;
+      }
+      if (finalOptions.fullscreenable === undefined) {
+        finalOptions.fullscreenable = false;
+      }
+    }
+
     const win = new BrowserWindow(
       merge(
         {
@@ -301,7 +314,7 @@ class WindowManager {
           },
         },
         platformOptions,
-        options,
+        finalOptions,
       ),
     );
 

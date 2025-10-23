@@ -123,6 +123,30 @@ class IPCEventsV2 {
         System,
       ).rebootWithConfirmation();
     });
+
+    ipcMain.handle('system:getStorageInfo', async (event) => {
+      return await getOrCreateInstance(
+        this.systemInstances,
+        event.sender.id,
+        System,
+      ).getStorageInfo();
+    });
+
+    ipcMain.handle('system:getServicesUsingTFCard', async (event) => {
+      return await getOrCreateInstance(
+        this.systemInstances,
+        event.sender.id,
+        System,
+      ).getServicesUsingTFCard();
+    });
+
+    ipcMain.handle('system:clearCache', async (event) => {
+      return await getOrCreateInstance(
+        this.systemInstances,
+        event.sender.id,
+        System,
+      ).clearCacheWithConfirmation();
+    });
   }
 
   registerLogEvents() {

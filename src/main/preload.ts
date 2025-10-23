@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-type SystemChannels = 'system:reboot' | 'system:shutdown';
+type SystemChannels =
+  | 'system:reboot'
+  | 'system:shutdown'
+  | 'system:getStorageInfo'
+  | 'system:getServicesUsingTFCard'
+  | 'system:clearCache'
+  | 'system:clear-cache-progress'
+  | 'system:clear-cache-confirmed';
 type PackageChannels = 'package:query' | 'package:clear' | 'package:clear-single';
 
 // 定义允许的 IPC 通道

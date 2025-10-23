@@ -14,6 +14,7 @@ import RealTimeLog from './pages/RealTimeLog';
 import AppUpdate from './pages/AppUpdate';
 import AppSwitch from './pages/AppSwitch';
 import PackageManager from './pages/PackageManager';
+import StorageViewer from './pages/StorageViewer';
 import { NotificationProvider } from './components/NotificationProvider';
 // import TitleBar from './components/TitleBar';
 import './App.scss';
@@ -95,6 +96,7 @@ function AppContent() {
           <Route path="/log-history-viewer" element={<HistoryLog />} />
           <Route path="/log-real-time-viewer" element={<RealTimeLog />} />
           <Route path="/package-manager" element={<PackageManager />} />
+          <Route path="/storage-viewer" element={<StorageViewer />} />
         </Routes>
       </div>
     </div>

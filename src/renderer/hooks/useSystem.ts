@@ -1,14 +1,26 @@
-export const useSystem = () => {
-  const systemReboot = () => {
-    return window.electron.ipcRenderer.invoke('system:reboot');
-  };
+import { useCallback } from 'react';
 
-  const systemShutdown = () => {
+export const useSystem = () => {
+  const getStorageInfo = useCallback(() => {
+    return window.electron.ipcRenderer.invoke('system:getStorageInfo');
+  }, []);
+
+  const systemReboot = useCallback(() => {
+    return window.electron.ipcRenderer.invoke('system:reboot');
+  }, []);
+
+  const systemShutdown = useCallback(() => {
     return window.electron.ipcRenderer.invoke('system:shutdown');
-  };
+  }, []);
+
+  const clearCache = useCallback(() => {
+    return window.electron.ipcRenderer.invoke('system:clearCache');
+  }, []);
 
   return {
+    getStorageInfo,
     systemReboot,
     systemShutdown,
+    clearCache,
   };
 };
