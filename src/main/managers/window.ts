@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+// import * as fs from 'fs';
 import {
   app,
   BrowserWindow,
@@ -12,10 +12,10 @@ import {
 import { merge } from 'lodash';
 import path from 'path';
 import log from 'electron-log';
-import { encodeBase64, resolveHtmlPath, getAssetPath } from '../util';
+import { resolveHtmlPath, getAssetPath } from '../util';
 import MenuBuilder from '../menu';
 import { sshManager } from '.';
-import System from '../events/system';
+// import System from '../events/system';
 
 class WindowManager {
   public loginWindow: BrowserWindow = null;
@@ -113,46 +113,6 @@ class WindowManager {
         label: '显示/隐藏应用',
         click: () => this.toggleWindowVisibility(),
       },
-      { type: 'separator' },
-      {
-        label: '实时日志',
-        click: () => this.createChildWindow('log-real-time-viewer'),
-      },
-      {
-        label: '历史日志',
-        click: () => this.createChildWindow('log-history-viewer'),
-      },
-      {
-        label: '远程调试',
-        click: () => this.createChildWindow('remote-debug'),
-      },
-      {
-        label: 'UI应用升级',
-        click: () =>
-          this.createChildWindow('app-update', { width: 500, height: 650 }),
-      },
-      {
-        label: '应用切换',
-        click: () =>
-          this.createChildWindow('app-switch', { width: 500, height: 850 }),
-      },
-      {
-        label: '机器人包裹',
-        click: () =>
-          this.createChildWindow('package-manager', {
-            width: 500,
-            height: 650,
-          }),
-      },
-      {
-        label: '系统重启',
-        click: async () => {
-          this.showDialogAndHandleWindow(async (window) => {
-            const systemEvents = new System(window.id);
-            await systemEvents.rebootWithConfirmation();
-          });
-        },
-      },
 
       { type: 'separator' },
       {
@@ -185,23 +145,6 @@ class WindowManager {
         this.toggleWindowVisibility();
       }
     });
-  }
-
-  private async showDialogAndHandleWindow(
-    dialogAction: (window: BrowserWindow) => Promise<void>,
-  ) {
-    const wasVisible = this.mainWindow?.isVisible();
-    if (!wasVisible) {
-      this.showMainWindow();
-    }
-
-    if (this.mainWindow) {
-      await dialogAction(this.mainWindow);
-    }
-
-    if (!wasVisible) {
-      this.hideMainWindow();
-    }
   }
 
   hideMainWindow() {

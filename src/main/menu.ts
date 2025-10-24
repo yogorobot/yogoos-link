@@ -50,17 +50,17 @@ export default class MenuBuilder {
 
   buildDarwinTemplate(): MenuItemConstructorOptions[] {
     const subMenuAbout: DarwinMenuItemConstructorOptions = {
-      label: 'YogoTool',
+      label: 'Yolink',
       submenu: [
         {
-          label: 'About YogoTool',
+          label: 'About Yolink',
           selector: 'orderFrontStandardAboutPanel:',
         },
         { type: 'separator' },
         { label: 'Services', submenu: [] },
         { type: 'separator' },
         {
-          label: 'Hide YogoTool',
+          label: 'Hide Yolink',
           accelerator: 'Command+H',
           selector: 'hide:',
         },
