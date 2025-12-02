@@ -1,4 +1,4 @@
-import { Client } from 'ssh2';
+import { Client, ClientChannel } from 'ssh2';
 import log from 'electron-log';
 import {
   encodeBase64,
@@ -21,6 +21,8 @@ export interface SSHCredentials {
   jumpHost?: string;
   jumpPort?: string;
   jumpUsername?: string;
+  jumpAuthType?: 'password' | 'key';
+  jumpPassword?: string;
   jumpKeyFilePath?: string;
 }
 
@@ -49,6 +51,7 @@ export class SSHAuthManager {
     string,
     { connectionCount: number; createdAt: Date }
   > = new Map();
+  private tunnelConnections: Map<string, Set<net.Socket>> = new Map();
 
   public async authenticateSSH(
     credentials: SSHCredentials,
@@ -136,17 +139,24 @@ export class SSHAuthManager {
       keepaliveCountMax: 2,
     };
 
-    try {
-      const keyPath =
-        credentials.jumpKeyFilePath?.replace(/^~/, os.homedir()) ||
-        path.join(os.homedir(), '.ssh', 'id_rsa');
-      if (!fs.existsSync(keyPath)) {
-        return resolve(new ErrorResponse(`SSH key file not found: ${keyPath}`));
-      }
-      jumpOptions.privateKey = fs.readFileSync(keyPath);
+    if (credentials.jumpAuthType === 'password') {
+      jumpOptions.password = credentials.jumpPassword;
       jumpConn.connect(jumpOptions);
-    } catch (error) {
-      resolve(new ErrorResponse(`Failed to read SSH key: ${error.message}`));
+    } else {
+      try {
+        const keyPath =
+          credentials.jumpKeyFilePath?.replace(/^~/, os.homedir()) ||
+          path.join(os.homedir(), '.ssh', 'id_rsa');
+        if (!fs.existsSync(keyPath)) {
+          return resolve(
+            new ErrorResponse(`SSH key file not found: ${keyPath}`),
+          );
+        }
+        jumpOptions.privateKey = fs.readFileSync(keyPath);
+        jumpConn.connect(jumpOptions);
+      } catch (error) {
+        resolve(new ErrorResponse(`Failed to read SSH key: ${error.message}`));
+      }
     }
   }
 
@@ -313,7 +323,40 @@ export class SSHAuthManager {
       if (!this.sshConnection) {
         return resolve(new ErrorResponse('SSH connection not established.'));
       }
+
+      let tunnelId: string | null = null;
+      const trackedSockets = new Set<net.Socket>();
+
       const server = net.createServer((clientSocket) => {
+        trackedSockets.add(clientSocket);
+        let tunnelStream: ClientChannel | null = null;
+
+        const safeCloseStream = () => {
+          if (!tunnelStream) return;
+          if (typeof tunnelStream.close === 'function') {
+            tunnelStream.close();
+          } else {
+            tunnelStream.end();
+          }
+          tunnelStream = null;
+        };
+
+        clientSocket.on('error', (socketError) => {
+          const tunnelLabel = tunnelId ? ` (${tunnelId})` : '';
+          log.warn(
+            `Tunnel client socket error${tunnelLabel}: ${socketError.message}`,
+          );
+          safeCloseStream();
+          if (!clientSocket.destroyed) {
+            clientSocket.destroy();
+          }
+        });
+
+        clientSocket.on('close', () => {
+          safeCloseStream();
+          trackedSockets.delete(clientSocket);
+        });
+
         this.sshConnection.forwardOut(
           options.sourceHost || '127.0.0.1',
           options.sourcePort || 0,
@@ -322,40 +365,72 @@ export class SSHAuthManager {
           (err, stream) => {
             if (err) {
               log.error('Tunnel forwarding error:', err);
-              clientSocket.end();
+              safeCloseStream();
+              if (!clientSocket.destroyed) {
+                clientSocket.destroy();
+              }
               return;
             }
+
+            tunnelStream = stream;
+
+            stream.on('error', (streamError) => {
+              const tunnelLabel = tunnelId ? ` (${tunnelId})` : '';
+              log.warn(
+                `SSH tunnel stream error${tunnelLabel}: ${streamError.message}`,
+              );
+              safeCloseStream();
+              clientSocket.destroy(streamError);
+            });
+
+            stream.on('close', () => {
+              safeCloseStream();
+              if (!clientSocket.destroyed) {
+                clientSocket.destroy();
+              }
+            });
+
             clientSocket.pipe(stream).pipe(clientSocket);
           },
         );
       });
+
       server.listen(options.localPort, options.localHost, () => {
         const { port } = server.address() as net.AddressInfo;
-        const tunnelId = `tunnel_${++this.tunnelCounter}`;
+        tunnelId = `tunnel_${++this.tunnelCounter}`;
         this.activeTunnels.set(tunnelId, server);
+        this.tunnelConnections.set(tunnelId, trackedSockets);
         resolve(new SuccessResponse({ localPort: port, tunnelId }));
       });
-      server.on('error', (err) =>
-        resolve(new ErrorResponse(`Tunnel server error: ${err.message}`)),
-      );
+
+      server.on('error', (err) => {
+        log.error('Tunnel server error:', err);
+        resolve(new ErrorResponse(`Tunnel server error: ${err.message}`));
+      });
     });
   }
 
   public closeTunnel(tunnelId: string): Response<boolean> {
     const server = this.activeTunnels.get(tunnelId);
     if (!server) return new ErrorResponse('Tunnel not found.');
+    const sockets = this.tunnelConnections.get(tunnelId);
+    sockets?.forEach((socket) => socket.destroy());
     server.close();
     this.activeTunnels.delete(tunnelId);
+    this.tunnelConnections.delete(tunnelId);
     return new SuccessResponse(true);
   }
 
   public closeAllTunnels(): void {
     log.info(`Closing ${this.activeTunnels.size} active tunnels.`);
     this.activeTunnels.forEach((server, tunnelId) => {
+      const sockets = this.tunnelConnections.get(tunnelId);
+      sockets?.forEach((socket) => socket.destroy());
       server.close();
       log.info(`Tunnel closed: ${tunnelId}`);
     });
     this.activeTunnels.clear();
+    this.tunnelConnections.clear();
   }
 }
 

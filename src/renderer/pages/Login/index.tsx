@@ -13,6 +13,8 @@ interface SSHCredentials {
   jumpHost?: string;
   jumpPort?: string;
   jumpUsername?: string;
+  jumpAuthType?: 'password' | 'key';
+  jumpPassword?: string;
   jumpKeyFilePath?: string;
 }
 
@@ -37,6 +39,8 @@ const Index = () => {
     jumpHost: '',
     jumpPort: '1111',
     jumpUsername: '',
+    jumpAuthType: 'key',
+    jumpPassword: '',
     jumpKeyFilePath: '~/.ssh/id_rsa',
   });
 
@@ -210,6 +214,8 @@ const Index = () => {
       jumpHost: tempJumpHostSettings.jumpHost ?? prev.jumpHost,
       jumpPort: tempJumpHostSettings.jumpPort ?? prev.jumpPort,
       jumpUsername: tempJumpHostSettings.jumpUsername ?? prev.jumpUsername,
+      jumpAuthType: tempJumpHostSettings.jumpAuthType ?? prev.jumpAuthType,
+      jumpPassword: tempJumpHostSettings.jumpPassword ?? prev.jumpPassword,
       jumpKeyFilePath:
         tempJumpHostSettings.jumpKeyFilePath ?? prev.jumpKeyFilePath,
     }));
@@ -290,7 +296,7 @@ const Index = () => {
           } as React.CSSProperties
         }
       >
-        <div className="relative text-center my-4">
+        <div className="relative text-center my-6 mt-10">
           <div className="group relative inline-flex items-center justify-center p-1">
             {/* Unified Glow Effect for the whole component */}
             <div
@@ -303,7 +309,7 @@ const Index = () => {
             />
 
             {/* Shared Background Plate */}
-            <div className="relative flex items-center h-15 bg-gray-900/80 backdrop-blur-sm shadow-2xl px-4">
+            <div className="relative flex items-center h-10 bg-gray-900/80 backdrop-blur-sm shadow-2xl px-4">
               {/* Icon */}
               {/* <div className="relative w-16 h-16 flex items-center justify-center">
                 <img
@@ -595,6 +601,8 @@ const Index = () => {
                 jumpHost: credentials.jumpHost,
                 jumpPort: credentials.jumpPort,
                 jumpUsername: credentials.jumpUsername,
+                jumpAuthType: credentials.jumpAuthType,
+                jumpPassword: credentials.jumpPassword,
                 jumpKeyFilePath: credentials.jumpKeyFilePath,
               });
               setShowJumpHostSettings(true);
@@ -666,40 +674,20 @@ const Index = () => {
 
       {/* 跳板机设置模态框 */}
       {showJumpHostSettings && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
           <div className="bg-gray-800/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             {/* 模态框头部 */}
-            <div className="flex items-center justify-between p-6 pb-4 border-b border-white/10">
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <div className="flex items-center justify-between px-6 pt-3 pb-2 border-b border-white/10">
+              <h2 className="text-md font-semibold text-white flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full" />
                 跳板机设置
               </h2>
-              <button
-                type="button"
-                onClick={handleCancelJumpHostSettings}
-                className="p-2 text-white/60 hover:text-white/90 hover:bg-white/10 rounded-lg transition-all"
-                aria-label="关闭设置"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
             </div>
 
             {/* 模态框内容 */}
-            <div className="p-6 space-y-4">
+            <div className="p-3 space-y-4">
               {/* 启用跳板机选项 */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <label className="flex items-center gap-3 cursor-pointer text-sm text-white/90 select-none bg-white/5 hover:bg-white/8 border border-white/10 rounded-lg px-4 py-3 transition-all">
                   <input
                     type="checkbox"
@@ -725,7 +713,7 @@ const Index = () => {
               {/* 跳板机配置表单 */}
               {(tempJumpHostSettings.useJumpHost ??
                 credentials.useJumpHost) && (
-                <div className="space-y-4 p-4 bg-gradient-to-br from-white/5 to-white/2 border border-white/10 rounded-xl">
+                <div className="space-y-3 p-3 bg-gradient-to-br from-white/5 to-white/2 border border-white/10 rounded-xl">
                   <div className="space-y-2">
                     <label className="block text-xs font-medium text-white/90">
                       跳板机地址
@@ -789,32 +777,88 @@ const Index = () => {
 
                   <div className="space-y-2">
                     <label className="block text-xs font-medium text-white/90">
-                      SSH私钥文件
+                      认证方式
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="jumpAuthType"
+                          value="key"
+                          checked={
+                            (tempJumpHostSettings.jumpAuthType ??
+                              credentials.jumpAuthType) !== 'password'
+                          }
+                          onChange={handleTempInputChange}
+                          className="w-4 h-4 text-green-500 focus:ring-green-500 border-gray-300"
+                        />
+                        <span className="text-sm text-white/90">密钥</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="jumpAuthType"
+                          value="password"
+                          checked={
+                            (tempJumpHostSettings.jumpAuthType ??
+                              credentials.jumpAuthType) === 'password'
+                          }
+                          onChange={handleTempInputChange}
+                          className="w-4 h-4 text-green-500 focus:ring-green-500 border-gray-300"
+                        />
+                        <span className="text-sm text-white/90">密码</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {(tempJumpHostSettings.jumpAuthType ??
+                    credentials.jumpAuthType) === 'password' ? (
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-white/90">
+                        密码
+                      </label>
                       <input
-                        type="text"
-                        name="jumpKeyFilePath"
+                        type="password"
+                        name="jumpPassword"
                         value={
-                          tempJumpHostSettings.jumpKeyFilePath ??
-                          (credentials.jumpKeyFilePath || '')
+                          tempJumpHostSettings.jumpPassword ??
+                          credentials.jumpPassword
                         }
                         onChange={handleTempInputChange}
-                        placeholder="请选择SSH私钥文件"
-                        className="flex-1 bg-white/8 border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/60 focus:bg-white/12 transition-all backdrop-blur-sm font-mono"
+                        placeholder="请输入跳板机密码"
+                        className="w-full bg-white/8 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/60 focus:bg-white/12 transition-all backdrop-blur-sm"
                       />
-                      <button
-                        type="button"
-                        onClick={handleKeyFileSelect}
-                        className="bg-gradient-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 border border-green-500/30 rounded-xl px-3 py-2 text-white text-xs font-medium transition-all flex-shrink-0"
-                      >
-                        选择
-                      </button>
                     </div>
-                    <p className="text-xs text-white/60">
-                      💡 请选择私钥文件，不是 .pub 公钥文件
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-white/90">
+                        SSH私钥文件
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          name="jumpKeyFilePath"
+                          value={
+                            tempJumpHostSettings.jumpKeyFilePath ??
+                            (credentials.jumpKeyFilePath || '')
+                          }
+                          onChange={handleTempInputChange}
+                          placeholder="请选择SSH私钥文件"
+                          className="flex-1 bg-white/8 border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/60 focus:bg-white/12 transition-all backdrop-blur-sm font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleKeyFileSelect}
+                          className="bg-gradient-to-r hover:from-green-500/30 hover:to-green-600/30 border border-green-500/30 rounded-xl px-3 py-2 text-white text-xs font-medium transition-all flex-shrink-0"
+                        >
+                          选择
+                        </button>
+                      </div>
+                      <p className="text-xs text-white/60">
+                        💡 请选择私钥文件，不是 .pub 公钥文件
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
