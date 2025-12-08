@@ -1,4 +1,4 @@
-@use 'tailwindcss';
+@import "tailwindcss";
 
 /*
  * @NOTE: Prepend a `~` to css file paths that are in your node_modules
@@ -13,14 +13,14 @@ body {
   color: white;
   -webkit-tap-highlight-color: transparent;
   outline: none;
-  overflow: hidden; // 防止窗口出现滚动条
-  background: #1e293b; // 使用solid背景色而不是透明
+  overflow: hidden; /* 防止窗口出现滚动条 */
+  background: #1e293b; /* 使用solid背景色而不是透明 */
 }
 
 #root {
   width: 100%;
   height: 100%;
-  // min-height: 100vh;
+  /* min-height: 100vh; */
 }
 
 /* 自定义滚动条样式 */
