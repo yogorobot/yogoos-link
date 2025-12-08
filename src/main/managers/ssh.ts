@@ -10,7 +10,6 @@ import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { windowManager } from '.';
 
 export interface SSHCredentials {
   host: string;
@@ -231,6 +230,8 @@ export class SSHAuthManager {
     // Dynamically require to avoid circular dependencies
     // Use setImmediate to allow the current call stack to clear before creating a new window.
     setImmediate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+      const { windowManager } = require('.');
       windowManager.createLoginWindow();
     });
   }
