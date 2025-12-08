@@ -17,10 +17,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -40,7 +45,7 @@ jobs:
     # This job runs after all build jobs have successfully completed.
     needs: build
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: write # This permission is required to create a release.
 
