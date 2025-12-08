@@ -4,6 +4,7 @@ import { ErrorResponse, SuccessResponse } from '../util';
 
 class FileManager {
   window: BrowserWindow | null = null;
+
   constructor(windowId: number) {
     this.window = BrowserWindow.fromId(windowId);
     this.window?.once('closed', () => {
@@ -11,6 +12,7 @@ class FileManager {
       this.window = null;
     });
   }
+
   async showOpenDialog(options: OpenDialogOptions) {
     try {
       const result = await dialog.showOpenDialog(this.window, options);

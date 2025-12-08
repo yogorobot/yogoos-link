@@ -6,7 +6,7 @@ const buildFilterCommand = (filters): string => {
 
   // 搜索关键词过滤
   if (filters.searchTerm) {
-    const searchTerm = filters.searchTerm;
+    const { searchTerm } = filters;
     const caseFlag = filters.caseSensitive ? '' : '-i';
     commands.push(`grep -F ${caseFlag} '${searchTerm}'`);
   }
@@ -53,6 +53,7 @@ const formatFileList = (result) => {
 
 class Logs {
   processMap: Map<string, () => void> = new Map();
+
   window: BrowserWindow | null = null;
 
   constructor(windowId: number) {
@@ -75,6 +76,7 @@ class Logs {
     return formatFileList(result);
   }
 
+  // eslint-disable-next-line class-methods-use-this
   async getHistoryLogList() {
     const result = await sshManager.executeCommand(
       `ls -l /var/log/meteor-*.gz`,
@@ -83,6 +85,7 @@ class Logs {
     return formatFileList(result);
   }
 
+  // eslint-disable-next-line class-methods-use-this
   async checkLogMeteorFile() {
     const { sshConnection } = sshManager;
     if (!sshConnection) {
@@ -93,7 +96,7 @@ class Logs {
       '[ -f /var/run/log/meteor.log ] && echo "exists" || echo "not exists"',
     );
 
-    return checkResult.trim() == 'exists';
+    return checkResult.trim() === 'exists';
   }
 
   async cleanup() {

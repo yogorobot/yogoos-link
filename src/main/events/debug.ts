@@ -1,5 +1,5 @@
-import { sshManager } from '../managers';
 import { BrowserWindow, dialog } from 'electron';
+import { sshManager } from '../managers';
 import { ErrorResponse, SuccessResponse } from '../util';
 
 interface IFormValues {
@@ -29,7 +29,9 @@ const restartServices = () => {
 
 class Debug {
   private activeTunnelId: string | null = null;
+
   private retryTimer: NodeJS.Timeout | null = null;
+
   window: BrowserWindow | null = null;
 
   constructor(windowId) {
@@ -45,7 +47,8 @@ class Debug {
     const localPort = formValues['local-port'];
     const remotePort = formValues['remote-port'];
 
-    return new Promise(async (resolve, reject) => {
+    // eslint-disable-next-line no-async-promise-executor
+    return new Promise(async (resolve) => {
       try {
         await sshManager.executeCommand(setPermission('777'));
         const line = await sshManager.executeCommand(
@@ -64,7 +67,8 @@ class Debug {
             await this.enableDebugConfig(formValues);
           } else {
             // 用户选择取消，执行相应逻辑
-            return resolve(new ErrorResponse('用户取消操作'));
+            resolve(new ErrorResponse('用户取消操作'));
+            return;
           }
         }
 
@@ -84,9 +88,9 @@ class Debug {
 
             const tunnelResult = await sshManager.createTunnel({
               localHost: 'localhost',
-              localPort: parseInt(localPort),
+              localPort: parseInt(localPort, 10),
               remoteHost: 'localhost',
-              remotePort: parseInt(remotePort),
+              remotePort: parseInt(remotePort, 10),
             });
 
             console.log(`隧道创建结果:`, tunnelResult);
@@ -107,11 +111,12 @@ class Debug {
             );
 
             if (attempt === maxTunnelRetries) {
-              return resolve(
+              resolve(
                 new ErrorResponse(
                   `SSH隧道建立失败，已尝试${maxTunnelRetries}次: ${error.message}`,
                 ),
               );
+              return;
             }
 
             // 等待后重试
@@ -120,7 +125,8 @@ class Debug {
         }
 
         if (!tunnelEstablished) {
-          return resolve(new ErrorResponse('SSH隧道建立失败'));
+          resolve(new ErrorResponse('SSH隧道建立失败'));
+          return;
         }
 
         // 调用新的checkUrl方法
@@ -206,6 +212,7 @@ class Debug {
     });
   }
 
+  // eslint-disable-next-line class-methods-use-this
   private async enableDebugConfig(formValues): Promise<void> {
     // const targetWindow = BrowserWindow.fromId(windowId);
     // 处理调试连接逻辑

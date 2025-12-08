@@ -31,7 +31,6 @@ export function decodeBase64<T>(data: string): T {
   return JSON.parse(Buffer.from(data, 'base64').toString('utf-8')) as T;
 }
 
-
 export function getAssetPath(...paths: string[]): string {
   const RESOURCES_PATH = app.isPackaged
     ? path.join(process.resourcesPath, 'assets')
@@ -42,7 +41,9 @@ export function getAssetPath(...paths: string[]): string {
 
 export class Response<T> {
   success: boolean;
+
   data: T | null;
+
   error: string | null;
 
   constructor(success: boolean, data: T | null, error: string | null) {

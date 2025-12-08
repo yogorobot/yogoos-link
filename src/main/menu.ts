@@ -33,6 +33,7 @@ export default class MenuBuilder {
       ? this.buildDarwinTemplate()
       : this.buildDefaultTemplate();
   }
+
   setupDevelopmentEnvironment(): void {
     this.mainWindow.webContents.on('context-menu', (_, props) => {
       const { x, y } = props;

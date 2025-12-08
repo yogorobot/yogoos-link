@@ -5,7 +5,10 @@ type SystemChannels =
   | 'system:shutdown'
   | 'system:getStorageInfo'
   | 'system:getServicesUsingTFCard';
-type PackageChannels = 'package:query' | 'package:clear' | 'package:clear-single';
+type PackageChannels =
+  | 'package:query'
+  | 'package:clear'
+  | 'package:clear-single';
 
 // 定义允许的 IPC 通道
 type WindowChannels =
@@ -106,7 +109,7 @@ contextBridge.exposeInMainWorld('electron', {
   },
 } as IElectron);
 
-window.addEventListener('contextmenu', ev => {
+window.addEventListener('contextmenu', (ev) => {
   // 阻止默认行为
   ev.preventDefault();
 });

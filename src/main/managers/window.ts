@@ -19,9 +19,13 @@ import { sshManager } from '.';
 
 class WindowManager {
   public loginWindow: BrowserWindow = null;
+
   public mainWindow: BrowserWindow = null;
+
   public childWindows: Map<string, BrowserWindow> = new Map();
+
   private tray: Tray | null = null;
+
   private isQuitting = false;
 
   constructor() {}

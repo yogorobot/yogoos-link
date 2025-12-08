@@ -10,6 +10,7 @@ interface NotificationOptions {
 }
 
 class NotificationManager {
+  // eslint-disable-next-line class-methods-use-this
   show(options: NotificationOptions) {
     try {
       const { title, body, type = 'info', silent = false } = options;
@@ -32,21 +33,18 @@ class NotificationManager {
       return new SuccessResponse(null);
     } catch (err) {
       error('显示系统通知失败:', err);
-      return new ErrorResponse(
-        err instanceof Error ? err.message : '未知错误',
-      );
+      return new ErrorResponse(err instanceof Error ? err.message : '未知错误');
     }
   }
 
+  // eslint-disable-next-line class-methods-use-this
   checkPermission() {
     try {
       return new SuccessResponse({
         supported: Notification.isSupported(),
       });
     } catch (err) {
-      return new ErrorResponse(
-        err instanceof Error ? err.message : '未知错误',
-      );
+      return new ErrorResponse(err instanceof Error ? err.message : '未知错误');
     }
   }
 }

@@ -7,6 +7,7 @@ import { ErrorResponse, SuccessResponse } from '../util';
 
 class Package {
   window: Electron.BrowserWindow | null = null;
+
   constructor(windowId: number) {
     this.window = BrowserWindow.fromId(windowId);
     this.window?.on('closed', () => {
@@ -15,6 +16,7 @@ class Package {
     });
   }
 
+  // eslint-disable-next-line class-methods-use-this
   private async getClient() {
     const host = await sshManager.executeCommand('sudo hostname');
     return axios.create({
@@ -56,12 +58,12 @@ class Package {
         infoResponse.data.box_pack?.upper_box?.package_ids || [];
       const lowerPackages =
         infoResponse.data.box_pack?.lower_box?.package_ids || [];
-      const package_ids = [...upperPackages, ...lowerPackages];
+      const packageIds = [...upperPackages, ...lowerPackages];
 
-      if (package_ids.length === 0) return new SuccessResponse(0);
+      if (packageIds.length === 0) return new SuccessResponse(0);
       // 清空
       const clearResponse = await client.put('/v2/robot/clear/package', {
-        package_ids,
+        package_ids: packageIds,
         app_id: 'jarvis',
       });
       if (clearResponse.data.error) {
@@ -69,7 +71,7 @@ class Package {
           `清空包裹失败，错误码: ${clearResponse.data.error}`,
         );
       }
-      return new SuccessResponse(package_ids.length);
+      return new SuccessResponse(packageIds.length);
     } catch (error: any) {
       return new ErrorResponse(error.message || '主进程清空包裹失败');
     }

@@ -88,10 +88,7 @@ export const useWindow = () => {
 
   const closeWindow = useCallback(async (windowId?: number) => {
     try {
-      return await window.electron.ipcRenderer.invoke(
-        'window:close',
-        windowId,
-      );
+      return await window.electron.ipcRenderer.invoke('window:close', windowId);
     } catch (error) {
       console.error('Failed to close window:', error);
       return { success: false, error: 'Failed to close window' };

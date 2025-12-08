@@ -29,12 +29,15 @@ export const useNotification = () => {
           break;
       }
 
-      const result = await window.electron.ipcRenderer.invoke('notification:show', {
-        title: title || defaultTitle,
-        body,
-        type,
-        silent,
-      });
+      const result = await window.electron.ipcRenderer.invoke(
+        'notification:show',
+        {
+          title: title || defaultTitle,
+          body,
+          type,
+          silent,
+        },
+      );
 
       if (!result.success) {
         console.error('显示系统通知失败:', result.error);
@@ -45,45 +48,62 @@ export const useNotification = () => {
       return result;
     } catch (error) {
       console.error('系统通知调用失败:', error);
-      return { success: false, error: error instanceof Error ? error.message : '未知错误' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '未知错误',
+      };
     }
   }, []);
 
-  const showSuccess = useCallback((message: string, title?: string) => {
-    return showNotification({
-      title,
-      body: message,
-      type: 'success'
-    });
-  }, [showNotification]);
+  const showSuccess = useCallback(
+    (message: string, title?: string) => {
+      return showNotification({
+        title,
+        body: message,
+        type: 'success',
+      });
+    },
+    [showNotification],
+  );
 
-  const showError = useCallback((message: string, title?: string) => {
-    return showNotification({
-      title,
-      body: message,
-      type: 'error'
-    });
-  }, [showNotification]);
+  const showError = useCallback(
+    (message: string, title?: string) => {
+      return showNotification({
+        title,
+        body: message,
+        type: 'error',
+      });
+    },
+    [showNotification],
+  );
 
-  const showWarning = useCallback((message: string, title?: string) => {
-    return showNotification({
-      title,
-      body: message,
-      type: 'warning'
-    });
-  }, [showNotification]);
+  const showWarning = useCallback(
+    (message: string, title?: string) => {
+      return showNotification({
+        title,
+        body: message,
+        type: 'warning',
+      });
+    },
+    [showNotification],
+  );
 
-  const showInfo = useCallback((message: string, title?: string) => {
-    return showNotification({
-      title,
-      body: message,
-      type: 'info'
-    });
-  }, [showNotification]);
+  const showInfo = useCallback(
+    (message: string, title?: string) => {
+      return showNotification({
+        title,
+        body: message,
+        type: 'info',
+      });
+    },
+    [showNotification],
+  );
 
   const checkPermission = useCallback(async () => {
     try {
-      const result = await window.electron.ipcRenderer.invoke('notification:check-permission');
+      const result = await window.electron.ipcRenderer.invoke(
+        'notification:check-permission',
+      );
       return result;
     } catch (error) {
       console.error('检查通知权限失败:', error);

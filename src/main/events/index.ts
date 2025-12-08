@@ -47,22 +47,30 @@ const getInstance = <T>(map: Map<number, T>, event: IpcMainInvokeEvent) =>
 
 class IPCEventsV2 {
   logInstances: Map<number, Logs> = new Map<number, Logs>();
+
   debugInstances: Map<number, Debug> = new Map<number, Debug>();
+
   packageInstances: Map<number, Package> = new Map<number, Package>();
+
   systemInstances: Map<number, System> = new Map<number, System>();
+
   fileManagerInstances: Map<number, FileManager> = new Map<
     number,
     FileManager
   >();
+
   notificationManagerInstances: Map<number, NotificationManager> = new Map<
     number,
     NotificationManager
   >();
+
   windowInstances: Map<number, Window> = new Map<number, Window>();
+
   appSwitcherInstances: Map<number, AppSwitcher> = new Map<
     number,
     AppSwitcher
   >();
+
   appUpdaterInstances: Map<number, AppUpdater> = new Map<number, AppUpdater>();
 
   constructor() {

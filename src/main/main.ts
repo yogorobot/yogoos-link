@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import log from 'electron-log';
 import { windowManager, sshManager } from './managers';
-import IPCEventsV2 from '../main/events';
+import IPCEventsV2 from './events';
 
 // 应用退出时的资源清理
 const cleanupAndExit = () => {
@@ -57,6 +57,7 @@ app
         // If no windows exist at all, create a new login window.
         windowManager.createLoginWindow();
       }
+      return null;
     });
   })
   .catch(console.log);

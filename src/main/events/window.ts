@@ -1,9 +1,10 @@
-import { BrowserWindow, ipcMain } from 'electron';
-import { decodeBase64, ErrorResponse, SuccessResponse } from '../util';
+import { BrowserWindow } from 'electron';
+import { ErrorResponse, SuccessResponse } from '../util';
 import { sshManager, windowManager } from '../managers';
 
 class Window {
   window: BrowserWindow | null = null;
+
   constructor(winId) {
     this.window = BrowserWindow.fromId(winId);
     this.window?.once('closed', () => {
@@ -11,8 +12,9 @@ class Window {
       this.window = null;
     });
   }
+
   getCurrentInfo() {
-    const window = this.window;
+    const { window } = this;
     const info = {
       id: window.id,
       title: window.getTitle(),
@@ -25,6 +27,7 @@ class Window {
     return new SuccessResponse(info);
   }
 
+  // eslint-disable-next-line class-methods-use-this
   createChildWindow(filePath, options) {
     const window = windowManager.createChildWindow(filePath, options);
     if (window) {

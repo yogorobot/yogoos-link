@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog } from 'electron';
+import { BrowserWindow } from 'electron';
 import log from 'electron-log';
 import { sshManager } from '../managers';
 import { ErrorResponse, SuccessResponse } from '../util';
@@ -86,7 +86,9 @@ class AppSwitcher {
     }
   }
 
-  public async switchApp(options: IAppSwitcherOptions): Promise<SuccessResponse<void> | ErrorResponse> {
+  public async switchApp(
+    options: IAppSwitcherOptions,
+  ): Promise<SuccessResponse<void> | ErrorResponse> {
     try {
       await this.updateConfig(options);
 
@@ -117,6 +119,7 @@ class AppSwitcher {
     }
   }
 
+  // eslint-disable-next-line class-methods-use-this
   public async getCurrentApp(): Promise<
     | SuccessResponse<{
         currentApp: string;

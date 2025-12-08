@@ -35,6 +35,7 @@ class AppUpdater {
   }
 
   // 执行远程命令 - 统一错误处理
+  // eslint-disable-next-line class-methods-use-this
   private async runCommand(command: string): Promise<string> {
     try {
       return await sshManager.executeCommand(command);
@@ -54,6 +55,7 @@ class AppUpdater {
   }
 
   // 验证本地文件 - 精简版本
+  // eslint-disable-next-line class-methods-use-this
   private validateFile(options: IAppUpdateOptions): void {
     if (!fs.existsSync(options.filePath)) {
       throw new Error('文件不存在');
@@ -91,11 +93,13 @@ class AppUpdater {
     const attemptUpload = (): Promise<string> => {
       return new Promise((resolve, reject) => {
         if (!sshManager.sshConnection) {
-          return reject(new Error('SSH连接未建立'));
+          reject(new Error('SSH连接未建立'));
+          return;
         }
 
         // 设置上传超时
         const uploadTimeout = 30 * 60 * 1000; // 30分钟超时
+        // eslint-disable-next-line no-undef
         let timeoutId: NodeJS.Timeout | null = null;
         let isCompleted = false;
 
@@ -120,7 +124,8 @@ class AppUpdater {
         sshManager.sshConnection.sftp((err, sftp) => {
           if (err) {
             cleanup();
-            return reject(new Error(`SFTP连接失败: ${err.message}`));
+            reject(new Error(`SFTP连接失败: ${err.message}`));
+            return;
           }
 
           const readStream = fs.createReadStream(options.filePath);
@@ -211,7 +216,7 @@ class AppUpdater {
       try {
         return await attemptUpload();
       } catch (error) {
-        retryCount++;
+        retryCount += 1;
         log.error(`上传尝试 ${retryCount} 失败:`, error);
 
         if (retryCount >= maxRetries) {
@@ -272,9 +277,9 @@ class AppUpdater {
           percentage: 75,
         });
 
-        const targetDir = options.targetDirectory || '/srv/yogoos/apps/';
+        const unzipTargetDir = options.targetDirectory || '/srv/yogoos/apps/';
         await this.runCommand(
-          `unzip -o "${remotePath}" -d "${targetDir}" && rm -f "${remotePath}"`,
+          `unzip -o "${remotePath}" -d "${unzipTargetDir}" && rm -f "${remotePath}"`,
         );
 
         this.sendProgress({

@@ -1,12 +1,12 @@
 import { BrowserWindow, dialog } from 'electron';
-import { info } from 'electron-log';
-import log from 'electron-log';
+import log, { info } from 'electron-log';
+import axios from 'axios';
 import { sshManager } from '../managers';
 import { ErrorResponse, SuccessResponse } from '../util';
-import axios from 'axios';
 
 class System {
   window: BrowserWindow | null = null;
+
   constructor(windowId: number) {
     this.window = BrowserWindow.fromId(windowId);
     this.window?.once('closed', () => {
@@ -15,6 +15,7 @@ class System {
     });
   }
 
+  // eslint-disable-next-line class-methods-use-this
   private async getClient() {
     const host = await sshManager.executeCommand('sudo hostname');
     return axios.create({
@@ -24,6 +25,7 @@ class System {
     });
   }
 
+  // eslint-disable-next-line class-methods-use-this
   async getStorageInfo() {
     try {
       // 使用 bash -c 包装，确保命令总是返回 0
@@ -37,6 +39,7 @@ class System {
     }
   }
 
+  // eslint-disable-next-line class-methods-use-this
   async reboot() {
     try {
       await sshManager.executeCommand('sudo reboot');
@@ -50,7 +53,7 @@ class System {
   async rebootWithConfirmation(): Promise<
     SuccessResponse<void> | ErrorResponse
   > {
-    const window = this.window;
+    const { window } = this;
 
     const result = await dialog.showMessageBox(window, {
       type: 'warning',
@@ -64,7 +67,7 @@ class System {
 
     if (result.response === 1) {
       info('用户确认系统重启，正在执行重启命令');
-      return await this.reboot();
+      return this.reboot();
     }
 
     return new ErrorResponse('用户取消重启操作');
@@ -98,7 +101,7 @@ class System {
     }
   }
 
-
+  // eslint-disable-next-line class-methods-use-this
   async getTFCardMountPoint(): Promise<
     SuccessResponse<string> | ErrorResponse
   > {
@@ -154,23 +157,28 @@ class System {
         return new SuccessResponse([]);
       }
 
-      const pids = pidsOutput.trim().split('\n').filter(pid => pid.trim());
+      const pids = pidsOutput
+        .trim()
+        .split('\n')
+        .filter((pid) => pid.trim());
       const services: string[] = [];
 
       // 4. 对每个 PID 查找对应的 systemd 服务
-      for (const pid of pids) {
-        try {
-          const serviceCommand = `systemctl status ${pid} 2>/dev/null | grep -oP '●\\s+\\K[^\\s]+\\.service' | head -n 1 || echo ""`;
-          const serviceName = await sshManager.executeCommand(serviceCommand);
+      await Promise.all(
+        pids.map(async (pid) => {
+          try {
+            const serviceCommand = `systemctl status ${pid} 2>/dev/null | grep -oP '●\\s+\\K[^\\s]+\\.service' | head -n 1 || echo ""`;
+            const serviceName = await sshManager.executeCommand(serviceCommand);
 
-          if (serviceName.trim() && !services.includes(serviceName.trim())) {
-            services.push(serviceName.trim());
-            log.info(`发现服务: ${serviceName.trim()} (PID: ${pid})`);
+            if (serviceName.trim() && !services.includes(serviceName.trim())) {
+              services.push(serviceName.trim());
+              log.info(`发现服务: ${serviceName.trim()} (PID: ${pid})`);
+            }
+          } catch (error) {
+            log.warn(`查询 PID ${pid} 对应的服务失败:`, error);
           }
-        } catch (error) {
-          log.warn(`查询 PID ${pid} 对应的服务失败:`, error);
-        }
-      }
+        }),
+      );
 
       log.info('解析后的服务列表:', services);
       return new SuccessResponse(services);
@@ -180,15 +188,18 @@ class System {
     }
   }
 
-  async clearCacheWithConfirmation(): Promise<SuccessResponse<string> | ErrorResponse> {
-    const window = this.window;
+  async clearCacheWithConfirmation(): Promise<
+    SuccessResponse<string> | ErrorResponse
+  > {
+    const { window } = this;
     if (!window) {
       return new ErrorResponse('Window not found');
     }
 
     // 格式化存储卡的警告
     const dialogMessage = '您确定要格式化TF卡吗？';
-    const dialogDetail = '此操作将【永久删除TF卡上的所有数据】。这是一个无法恢复的危险操作！';
+    const dialogDetail =
+      '此操作将【永久删除TF卡上的所有数据】。这是一个无法恢复的危险操作！';
 
     const result = await dialog.showMessageBox(window, {
       type: 'warning',
@@ -353,7 +364,8 @@ else
 fi
 
 echo "格式化操作成功完成"
-`;      const exitCode = await sshManager.executeCommandWithStream(
+`;
+      const exitCode = await sshManager.executeCommandWithStream(
         formatScript,
         (data: string) => {
           this.window?.webContents.send('system:clear-cache-progress', data);

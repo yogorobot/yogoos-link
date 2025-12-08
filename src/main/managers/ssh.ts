@@ -1,15 +1,15 @@
 import { Client, ClientChannel } from 'ssh2';
 import log from 'electron-log';
+import * as net from 'net';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import {
   encodeBase64,
   SuccessResponse,
   ErrorResponse,
   Response,
 } from '../util';
-import * as net from 'net';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 
 export interface SSHCredentials {
   host: string;
@@ -41,15 +41,20 @@ export interface TunnelResult {
 
 export class SSHAuthManager {
   public sshConnection: Client = null;
+
   public sshCredentials: SSHCredentials = null;
+
   private isDisconnecting = false;
 
   private activeTunnels: Map<string, net.Server> = new Map();
+
   private tunnelCounter = 0;
+
   private tunnelStats: Map<
     string,
     { connectionCount: number; createdAt: Date }
   > = new Map();
+
   private tunnelConnections: Map<string, Set<net.Socket>> = new Map();
 
   public async authenticateSSH(
@@ -129,9 +134,11 @@ export class SSHAuthManager {
       resolve(new ErrorResponse(`Jump host connection failed: ${err.message}`));
     });
 
+    const jumpPort = parseInt(credentials.jumpPort || '22', 10);
+    const hostPort = parseInt(credentials.port, 10);
     const jumpOptions: any = {
       host: credentials.jumpHost,
-      port: parseInt(credentials.jumpPort || '22'),
+      port: jumpPort,
       username: credentials.jumpUsername,
       readyTimeout: 10000,
       keepaliveInterval: 3000,
@@ -179,7 +186,7 @@ export class SSHAuthManager {
 
     conn.connect({
       host: credentials.host,
-      port: parseInt(credentials.port),
+      port: parseInt(credentials.port, 10),
       username: credentials.username,
       password: credentials.password,
       readyTimeout: 10000,
@@ -239,17 +246,21 @@ export class SSHAuthManager {
   public executeCommand(command: string): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!this.sshConnection) {
-        return reject(new Error('SSH connection not established.'));
+        reject(new Error('SSH connection not established.'));
+        return;
       }
       let output = '';
       this.sshConnection.exec(command, (err, stream) => {
-        if (err) return reject(err);
+        if (err) {
+          reject(err);
+          return;
+        }
         stream
           .on('close', (code) => {
-            if (code !== 0)
-              return reject(
-                new Error(`Command failed with exit code: ${code}`),
-              );
+            if (code !== 0) {
+              reject(new Error(`Command failed with exit code: ${code}`));
+              return;
+            }
             resolve(output);
           })
           .on('data', (data) => {
@@ -268,11 +279,13 @@ export class SSHAuthManager {
   ): Promise<number> {
     return new Promise((resolve, reject) => {
       if (!this.sshConnection) {
-        return reject(new Error('SSH connection not established.'));
+        reject(new Error('SSH connection not established.'));
+        return;
       }
       this.sshConnection.exec(command, (err, stream) => {
         if (err) {
-          return reject(err);
+          reject(err);
+          return;
         }
         stream
           .on('close', (code: number) => {
@@ -299,7 +312,10 @@ export class SSHAuthManager {
         return reject(new Error('SSH connection not established.'));
       }
       this.sshConnection.exec(command, { pty: true }, (err, stream) => {
-        if (err) return reject(err);
+        if (err) {
+          reject(err);
+          return;
+        }
         const stopCommand = () => {
           if (stream && !stream.destroyed) {
             stream.write('\x03');
