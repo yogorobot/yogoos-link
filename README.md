@@ -29,14 +29,19 @@ YOLINK 是一款基于 **Electron**、**React** 和 **TypeScript** 构建的跨�
 
 ### 环境要求
 
--   Node.js (版本要求请参见 `package.json`)
+-   Node.js (版本要求请参见 `.nvmrc` 或 `package.json`，推荐 **v22**)
 -   npm
 
 ### 安装步骤
 
 1.  **克隆仓库。**
 
-2.  **安装依赖：**
+2.  **切换 Node 版本（建议）：**
+    ```bash
+    nvm use
+    ```
+
+3.  **安装依赖：**
     ```bash
     npm install
     ```

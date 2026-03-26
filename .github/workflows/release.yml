@@ -11,64 +11,65 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        include:
+          - os: macos-latest
+            platform_flag: '-m'
+          - os: windows-latest
+            platform_flag: '-w'
+          - os: ubuntu-latest
+            platform_flag: '-l'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm install
 
+      - name: Build application
+        run: npm run build
+
       - name: Package application
-        run: npm run package
+        run: npx electron-builder build --publish never ${{ matrix.platform_flag }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.os }}
-          # The path should not have a leading slash.
-          path: release/build/
+          path: |
+            release/build/*.dmg
+            release/build/*.zip
+            release/build/*.exe
+            release/build/*.AppImage
+            release/build/*.deb
+            release/build/*.yml
 
   create-release:
-    # This job runs after all build jobs have successfully completed.
     needs: build
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write # This permission is required to create a release.
+      contents: write
 
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          # The destination path for downloaded artifacts.
           path: artifacts/
-          # Use a pattern to merge artifacts from different build jobs into a single directory.
           merge-multiple: true
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
-          # The tag_name will be the git tag that triggered the workflow.
           tag_name: ${{ github.ref_name }}
-          # The name of the release will be "Release <tag>".
           name: Release ${{ github.ref_name }}
-          # Set draft to false to publish the release immediately.
           draft: false
           prerelease: false
-          # The files to upload to the release. This glob pattern will find all files
-          # from the downloaded artifacts.
           files: |
             artifacts/*
