@@ -172,6 +172,13 @@
     "webpack-dev-server": "^5.2.0",
     "webpack-merge": "^6.0.1"
   },
+  "overrides": {
+    "eslint-config-erb": {
+      "@typescript-eslint/typescript-estree": {
+        "minimatch": "^9.0.7"
+      }
+    }
+  },
   "build": {
     "productName": "Yolink",
     "appId": "com.yogo.yolink",
@@ -243,12 +250,11 @@
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": "^14.0.0",
+      "version": ">=20.0.0",
       "onFail": "error"
     },
     "packageManager": {
       "name": "npm",
-      "version": "^7.0.0",
       "onFail": "error"
     }
   },
