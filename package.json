@@ -1,7 +1,6 @@
 {
   "name": "yolink",
   "description": "A foundation for scalable desktop apps",
-  "packageManager": "npm@10.9.7",
   "keywords": [
     "electron",
     "boilerplate",
@@ -251,10 +250,6 @@
     "runtime": {
       "name": "node",
       "version": ">=20.0.0",
-      "onFail": "error"
-    },
-    "packageManager": {
-      "name": "npm",
       "onFail": "error"
     }
   },
