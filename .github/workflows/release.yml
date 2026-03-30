@@ -6,8 +6,25 @@ on:
       - 'v*.*.*'
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
   build:
+    needs: create-release
     runs-on: ${{ matrix.os }}
+    
+    permissions:
+      contents: write
 
     strategy:
       fail-fast: false
@@ -15,16 +32,12 @@ jobs:
         include:
           - os: macos-latest
             platform_flag: '--mac --arm64'
-            artifact_name: 'build-macos-arm64'
           - os: macos-latest
             platform_flag: '--mac --x64'
-            artifact_name: 'build-macos-x64'
           - os: windows-latest
             platform_flag: '-w'
-            artifact_name: 'build-windows'
           - os: ubuntu-latest
             platform_flag: '-l'
-            artifact_name: 'build-ubuntu'
 
     steps:
       - name: Checkout code
@@ -45,38 +58,14 @@ jobs:
       - name: Package application
         run: npx electron-builder build --publish never ${{ matrix.platform_flag }}
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: ${{ matrix.artifact_name }}
-          path: |
+          tag_name: ${{ github.ref_name }}
+          files: |
             release/build/*.dmg
             release/build/*.zip
             release/build/*.exe
             release/build/*.AppImage
             release/build/*.deb
             release/build/*.yml
-
-  create-release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-          merge-multiple: true
-
-      - name: Create Release and Upload Assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          files: |
-            artifacts/*
