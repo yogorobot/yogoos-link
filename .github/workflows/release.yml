@@ -10,14 +10,21 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
-            platform_flag: '-m'
+            platform_flag: '--mac --arm64'
+            artifact_name: 'build-macos-arm64'
+          - os: macos-latest
+            platform_flag: '--mac --x64'
+            artifact_name: 'build-macos-x64'
           - os: windows-latest
             platform_flag: '-w'
+            artifact_name: 'build-windows'
           - os: ubuntu-latest
             platform_flag: '-l'
+            artifact_name: 'build-ubuntu'
 
     steps:
       - name: Checkout code
@@ -41,7 +48,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}
+          name: ${{ matrix.artifact_name }}
           path: |
             release/build/*.dmg
             release/build/*.zip
