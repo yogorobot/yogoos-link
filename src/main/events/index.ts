@@ -19,15 +19,18 @@ import NotificationManager from './notification';
  */
 function getOrCreateInstance<T>(
   instancesMap: Map<number, T>,
-  windowId: number,
+  event: IpcMainInvokeEvent,
   instanceClass: new (...args: any[]) => T,
 ): T {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) {
+    throw new Error('Unable to resolve BrowserWindow from IPC sender.');
+  }
+
+  const windowId = window.id;
   if (instancesMap.has(windowId)) {
     return instancesMap.get(windowId)!;
   }
-
-  const window = BrowserWindow.fromId(windowId);
-  if (!window) instancesMap.delete(windowId);
 
   const newInstance = new instanceClass(windowId);
   instancesMap.set(windowId, newInstance);
@@ -43,7 +46,7 @@ function getOrCreateInstance<T>(
 }
 
 const getInstance = <T>(map: Map<number, T>, event: IpcMainInvokeEvent) =>
-  map.get(event.sender.id);
+  map.get(BrowserWindow.fromWebContents(event.sender)?.id ?? -1);
 
 class IPCEventsV2 {
   logInstances: Map<number, Logs> = new Map<number, Logs>();
@@ -103,21 +106,21 @@ class IPCEventsV2 {
     ipcMain.handle('package:query', (event) => {
       return getOrCreateInstance(
         this.packageInstances,
-        event.sender.id,
+        event,
         Package,
       ).queryPackages();
     });
     ipcMain.handle('package:clear', (event) => {
       return getOrCreateInstance(
         this.packageInstances,
-        event.sender.id,
+        event,
         Package,
       ).clearPackages();
     });
     ipcMain.handle('package:clear-single', (event, packageId: number) => {
       return getOrCreateInstance(
         this.packageInstances,
-        event.sender.id,
+        event,
         Package,
       ).clearSinglePackage(packageId);
     });
@@ -127,7 +130,7 @@ class IPCEventsV2 {
     ipcMain.handle('system:reboot', async (event) => {
       return await getOrCreateInstance(
         this.systemInstances,
-        event.sender.id,
+        event,
         System,
       ).rebootWithConfirmation();
     });
@@ -135,7 +138,7 @@ class IPCEventsV2 {
     ipcMain.handle('system:getStorageInfo', async (event) => {
       return await getOrCreateInstance(
         this.systemInstances,
-        event.sender.id,
+        event,
         System,
       ).getStorageInfo();
     });
@@ -143,7 +146,7 @@ class IPCEventsV2 {
     ipcMain.handle('system:getServicesUsingTFCard', async (event) => {
       return await getOrCreateInstance(
         this.systemInstances,
-        event.sender.id,
+        event,
         System,
       ).getServicesUsingTFCard();
     });
@@ -153,7 +156,7 @@ class IPCEventsV2 {
     ipcMain.handle('log:get-history-list', (event) => {
       return getOrCreateInstance(
         this.logInstances,
-        event.sender.id,
+        event,
         Logs,
       ).getHistoryLogList();
     });
@@ -161,7 +164,7 @@ class IPCEventsV2 {
     ipcMain.handle('log:get-stream-realtime-file', (event) => {
       return getOrCreateInstance(
         this.logInstances,
-        event.sender.id,
+        event,
         Logs,
       ).getStreamRealtimeFile();
     });
@@ -169,7 +172,7 @@ class IPCEventsV2 {
     ipcMain.handle('log:get-stream-realtime', (event, options) => {
       return getOrCreateInstance(
         this.logInstances,
-        event.sender.id,
+        event,
         Logs,
       ).getStreamRealtime(options);
     });
@@ -177,7 +180,7 @@ class IPCEventsV2 {
     ipcMain.handle('log:get-stream-history', (event, options) => {
       return getOrCreateInstance(
         this.logInstances,
-        event.sender.id,
+        event,
         Logs,
       ).getStreamHistory(options);
     });
@@ -212,7 +215,7 @@ class IPCEventsV2 {
     ipcMain.handle('window:get-current-info', (event) => {
       return getOrCreateInstance(
         this.windowInstances,
-        event.sender.id,
+        event,
         Window,
       ).getCurrentInfo();
     });
@@ -220,7 +223,7 @@ class IPCEventsV2 {
     ipcMain.handle('window:create', async (event, filePath, options) => {
       return getOrCreateInstance(
         this.windowInstances,
-        event.sender.id,
+        event,
         Window,
       ).createChildWindow(filePath, options);
     });
@@ -230,7 +233,7 @@ class IPCEventsV2 {
     ipcMain.handle('file:show-open-dialog', (event, options) => {
       const a = getOrCreateInstance(
         this.fileManagerInstances,
-        event.sender.id,
+        event,
         FileManager,
       ).showOpenDialog(options);
       return a;
@@ -241,7 +244,7 @@ class IPCEventsV2 {
     ipcMain.handle('debug:connect', (event, formValues) => {
       const debugInstance = getOrCreateInstance(
         this.debugInstances,
-        event.sender.id,
+        event,
         Debug,
       );
       return debugInstance.connect(formValues);
@@ -258,7 +261,7 @@ class IPCEventsV2 {
     ipcMain.handle('app:update', async (event, options: IAppUpdateOptions) => {
       return getOrCreateInstance(
         this.appUpdaterInstances,
-        event.sender.id,
+        event,
         AppUpdater,
       ).performUpdate(options);
     });
@@ -268,7 +271,7 @@ class IPCEventsV2 {
       async (event, options: IAppSwitcherOptions) => {
         return getOrCreateInstance(
           this.appSwitcherInstances,
-          event.sender.id,
+          event,
           AppSwitcher,
         ).switchApp(options);
       },
@@ -279,7 +282,7 @@ class IPCEventsV2 {
       async (event, options: IAppSwitcherOptions) => {
         return getOrCreateInstance(
           this.appSwitcherInstances,
-          event.sender.id,
+          event,
           AppSwitcher,
         ).getCurrentApp();
       },
@@ -290,14 +293,14 @@ class IPCEventsV2 {
     ipcMain.handle('notification:show', (event, options) => {
       return getOrCreateInstance(
         this.notificationManagerInstances,
-        event.sender.id,
+        event,
         NotificationManager,
       ).show(options);
     });
     ipcMain.handle('notification:check-permission', (event) => {
       return getOrCreateInstance(
         this.notificationManagerInstances,
-        event.sender.id,
+        event,
         NotificationManager,
       ).checkPermission();
     });

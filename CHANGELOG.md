@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6] - 2026-03-31
+
+### 🐛 问题修复 (Bug Fixes)
+- **Core**: 彻底修复 `ssh2` 依赖的 `sshcrypto.node` 原生模块导致的 macOS/ARM64 硬件崩溃问题。
+- **Stability**: 实现“物理忽略”方案，通过构建配置排除有问题组件。
+- **Release**: 修复生产环境下 `boot.js` 引导程序无法正确寻找并加载业务 `main.js` 的路径解析错误。
+
+
 ## [1.0.2] - 2025-12-08
 
 ### ✨ 新增功能 (Features)

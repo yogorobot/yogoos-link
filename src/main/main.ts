@@ -8,8 +8,8 @@ const cleanupAndExit = () => {
   log.info('应用退出清理开始...');
 
   try {
-    // 清理SSH资源（包含所有清理逻辑）
-    sshManager.removeConnection();
+    // 退出应用时只清理资源，不再重新拉起登录窗口。
+    sshManager.removeConnection({ reopenLoginWindow: false });
 
     log.info('资源清理完成');
   } catch (error) {

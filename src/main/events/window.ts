@@ -15,6 +15,10 @@ class Window {
 
   getCurrentInfo() {
     const { window } = this;
+    if (!window) {
+      return new ErrorResponse('窗口不存在或已关闭');
+    }
+
     const info = {
       id: window.id,
       title: window.getTitle(),
@@ -22,7 +26,7 @@ class Window {
       isMaximized: window.isMaximized(),
       isMinimized: window.isMinimized(),
       isFocused: window.isFocused(),
-      authInfo: sshManager.sshCredentials,
+      authInfo: sshManager.getPublicCredentials(),
     };
     return new SuccessResponse(info);
   }

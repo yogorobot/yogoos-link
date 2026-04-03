@@ -24,6 +24,7 @@ YOLINK 是一款基于 **Electron**、**React** 和 **TypeScript** 构建的跨�
 -   **核心技术**: Electron, React, TypeScript, Node.js
 -   **样式**: SCSS, CSS Modules, Tailwind CSS
 -   **构建与工具**: Webpack, ESLint, Prettier, Jest
+-   **稳定性**: 内置 `boot.js` 引导程序，自动禁用有问题的 `sshcrypto` 原生模块以防止 ARM64 (macOS) 平台崩溃。
 
 ## 🚀 开发人员指南
 

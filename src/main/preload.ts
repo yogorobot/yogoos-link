@@ -65,7 +65,6 @@ export interface AuthInfo {
   host: string;
   port: string;
   username: string;
-  password: string;
   // 跳板机相关配置
   useJumpHost?: boolean;
   jumpHost?: string;

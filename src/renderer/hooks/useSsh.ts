@@ -9,6 +9,10 @@ export const useSSH = () => {
       );
     } catch (error) {
       console.error('Failed to authenticate SSH:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'SSH 连接失败',
+      };
     }
   }, []);
 
@@ -17,6 +21,10 @@ export const useSSH = () => {
       return await window.electron.ipcRenderer.invoke('ssh:disconnect');
     } catch (error) {
       console.error('Failed to disconnect SSH:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '断开连接失败',
+      };
     }
   }, []);
 

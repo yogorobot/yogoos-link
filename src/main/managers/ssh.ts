@@ -1,15 +1,12 @@
-import { Client, ClientChannel } from 'ssh2';
 import log from 'electron-log';
 import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import {
-  encodeBase64,
-  SuccessResponse,
-  ErrorResponse,
-  Response,
-} from '../util';
+import type { Client as SSH2Client, ClientChannel } from 'ssh2';
+import { SuccessResponse, ErrorResponse, Response } from '../util';
+
+const { Client } = require('ssh2') as typeof import('ssh2');
 
 export interface SSHCredentials {
   host: string;
@@ -24,6 +21,11 @@ export interface SSHCredentials {
   jumpPassword?: string;
   jumpKeyFilePath?: string;
 }
+
+export type PublicSSHCredentials = Omit<
+  SSHCredentials,
+  'password' | 'jumpPassword'
+>;
 
 export interface TunnelOptions {
   localHost?: string;
@@ -40,7 +42,7 @@ export interface TunnelResult {
 }
 
 export class SSHAuthManager {
-  public sshConnection: Client = null;
+  public sshConnection: SSH2Client = null;
 
   public sshCredentials: SSHCredentials = null;
 
@@ -59,7 +61,7 @@ export class SSHAuthManager {
 
   public async authenticateSSH(
     credentials: SSHCredentials,
-  ): Promise<Response<string>> {
+  ): Promise<Response<null>> {
     this.isDisconnecting = false; // Reset flag on new connection attempt
     return new Promise((resolve) => {
       if (credentials.useJumpHost) {
@@ -72,7 +74,7 @@ export class SSHAuthManager {
 
   private connectThroughJumpHost(
     credentials: SSHCredentials,
-    resolve: (value: Response<string>) => void,
+    resolve: (value: Response<null>) => void,
   ): void {
     log.info(
       `Connecting to jump host: ${credentials.jumpUsername}@${credentials.jumpHost}:${credentials.jumpPort || '22'}`,
@@ -111,7 +113,7 @@ export class SSHAuthManager {
             this.sshCredentials = credentials;
             this.setupConnectionHandlers();
             targetConn.on('close', () => jumpConn.end());
-            resolve(new SuccessResponse(encodeBase64(credentials)));
+            resolve(new SuccessResponse(null));
           });
 
           targetConn.on('error', (err) => {
@@ -168,7 +170,7 @@ export class SSHAuthManager {
 
   private connectDirectly(
     credentials: SSHCredentials,
-    resolve: (value: Response<string>) => void,
+    resolve: (value: Response<null>) => void,
   ): void {
     const conn = new Client();
     conn.on('ready', () => {
@@ -176,7 +178,7 @@ export class SSHAuthManager {
       this.sshConnection = conn;
       this.sshCredentials = credentials;
       this.setupConnectionHandlers();
-      resolve(new SuccessResponse(encodeBase64(credentials)));
+      resolve(new SuccessResponse(null));
     });
 
     conn.on('error', (err) => {
@@ -214,7 +216,39 @@ export class SSHAuthManager {
     this.sshConnection.on('close', this.handleConnectionClose.bind(this));
   }
 
-  public removeConnection(): void {
+  public getPublicCredentials(): PublicSSHCredentials | null {
+    if (!this.sshCredentials) {
+      return null;
+    }
+
+    const {
+      host,
+      port,
+      username,
+      useJumpHost,
+      jumpHost,
+      jumpPort,
+      jumpUsername,
+      jumpAuthType,
+      jumpKeyFilePath,
+    } = this.sshCredentials;
+
+    return {
+      host,
+      port,
+      username,
+      useJumpHost,
+      jumpHost,
+      jumpPort,
+      jumpUsername,
+      jumpAuthType,
+      jumpKeyFilePath,
+    };
+  }
+
+  public removeConnection(
+    options: { reopenLoginWindow: boolean } = { reopenLoginWindow: true },
+  ): void {
     if (this.isDisconnecting) {
       log.warn('Disconnection process already in progress.');
       return;
@@ -233,6 +267,10 @@ export class SSHAuthManager {
 
     this.sshCredentials = null;
     log.info('SSH resources cleaned up.');
+
+    if (!options.reopenLoginWindow) {
+      return;
+    }
 
     // Dynamically require to avoid circular dependencies
     // Use setImmediate to allow the current call stack to clear before creating a new window.

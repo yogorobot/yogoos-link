@@ -7,7 +7,7 @@
     "name": "YoLink Maintainers",
     "email": "yuzhenquan@yogorobot.com"
   },
-  "main": "./dist/main/main.js",
+  "main": "./dist/main/boot.js",
   "scripts": {
     "rebuild": "node -r ts-node/register ../../.erb/scripts/electron-rebuild.js",
     "postinstall": "npm run rebuild && npm run link-modules",

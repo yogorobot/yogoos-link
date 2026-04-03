@@ -23,9 +23,76 @@ interface ServerRecord {
   host: string;
   port: string;
   username: string;
+  useJumpHost?: boolean;
+  jumpHost?: string;
+  jumpPort?: string;
+  jumpUsername?: string;
+  jumpAuthType?: 'password' | 'key';
+  jumpKeyFilePath?: string;
   timestamp: number;
   displayName: string;
 }
+
+const isBlank = (value?: string) => !value?.trim();
+
+const isValidPort = (value?: string) => {
+  if (isBlank(value)) {
+    return false;
+  }
+
+  if (!/^\d+$/.test(value || '')) {
+    return false;
+  }
+
+  const port = Number.parseInt(value || '', 10);
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
+};
+
+const validateJumpHostSettings = (
+  values: Partial<SSHCredentials>,
+): string | null => {
+  if (!values.useJumpHost) {
+    return null;
+  }
+
+  if (isBlank(values.jumpHost)) {
+    return '启用跳板机后，请填写跳板机地址';
+  }
+
+  if (!isValidPort(values.jumpPort || '22')) {
+    return '请输入有效的跳板机端口';
+  }
+
+  if (isBlank(values.jumpUsername)) {
+    return '启用跳板机后，请填写跳板机用户名';
+  }
+
+  if ((values.jumpAuthType ?? 'key') === 'password') {
+    if (isBlank(values.jumpPassword)) {
+      return '请选择密码认证后填写跳板机密码';
+    }
+
+    return null;
+  }
+
+  if (isBlank(values.jumpKeyFilePath)) {
+    return '请选择跳板机私钥文件';
+  }
+
+  return null;
+};
+
+const normalizeCredentials = (values: SSHCredentials): SSHCredentials => ({
+  ...values,
+  host: values.host.trim(),
+  port: values.port.trim(),
+  username: values.username.trim(),
+  jumpHost: values.jumpHost?.trim() || '',
+  jumpPort: values.jumpPort?.trim() || '',
+  jumpUsername: values.jumpUsername?.trim() || '',
+  jumpPassword: values.jumpPassword || '',
+  jumpKeyFilePath: values.jumpKeyFilePath?.trim() || '',
+});
 
 const Index = () => {
   const container = useRef<HTMLDivElement>(null);
@@ -98,6 +165,12 @@ const Index = () => {
         host: creds.host,
         port: creds.port,
         username: creds.username,
+        useJumpHost: creds.useJumpHost,
+        jumpHost: creds.jumpHost,
+        jumpPort: creds.jumpPort,
+        jumpUsername: creds.jumpUsername,
+        jumpAuthType: creds.jumpAuthType,
+        jumpKeyFilePath: creds.jumpKeyFilePath,
         timestamp: Date.now(),
         displayName: `${creds.username}@${creds.host}:${creds.port}`,
       };
@@ -134,6 +207,13 @@ const Index = () => {
       port: record.port,
       username: record.username,
       password: '', // 清空密码，需要用户重新输入
+      useJumpHost: record.useJumpHost ?? false,
+      jumpHost: record.jumpHost ?? '',
+      jumpPort: record.jumpPort ?? prev.jumpPort,
+      jumpUsername: record.jumpUsername ?? '',
+      jumpAuthType: record.jumpAuthType ?? prev.jumpAuthType,
+      jumpPassword: '',
+      jumpKeyFilePath: record.jumpKeyFilePath ?? prev.jumpKeyFilePath,
     }));
     // showSuccess(`已应用设备记录: ${record.displayName}`);
   };
@@ -207,6 +287,16 @@ const Index = () => {
 
   // 确认保存跳板机设置
   const handleConfirmJumpHostSettings = () => {
+    const nextCredentials = {
+      ...credentials,
+      ...tempJumpHostSettings,
+    };
+    const validationError = validateJumpHostSettings(nextCredentials);
+    if (validationError) {
+      showError(validationError);
+      return;
+    }
+
     // 将临时状态应用到正式配置
     setCredentials((prev) => ({
       ...prev,
@@ -231,18 +321,29 @@ const Index = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nextCredentials = normalizeCredentials(credentials);
+    const validationError = validateJumpHostSettings(nextCredentials);
+    if (validationError) {
+      showError(validationError);
+      return;
+    }
+    if (!isValidPort(nextCredentials.port)) {
+      showError('请输入有效的设备端口');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       // 调用主进程进行SSH认证
-      const result = await authenticate(credentials);
+      const result = await authenticate(nextCredentials);
 
       if (!result.success) {
         showError(result.error || '连接失败，请检查您的SSH连接信息');
       } else {
         showSuccess('连接成功!');
         // 保存成功连接的设备记录
-        saveServerRecord(credentials);
+        saveServerRecord(nextCredentials);
       }
     } catch (authError) {
       showError(`连接过程中发生错误: ${authError.message || '未知错误'}`);

@@ -12,7 +12,7 @@
     "hot",
     "reload"
   ],
-  "main": "./.erb/dll/main.bundle.dev.js",
+  "main": "./src/main/boot.js",
   "scripts": {
     "icons": "bash ./scripts/generate-icons.sh",
     "build": "concurrently \"npm run build:main\" \"npm run build:renderer\"",
@@ -191,7 +191,8 @@
       ".erb/dll/**/*",
       "dist",
       "node_modules",
-      "package.json"
+      "package.json",
+      "!node_modules/ssh2/lib/protocol/crypto/build/Release/sshcrypto.node"
     ],
     "mac": {
       "icon": "assets/icon.icns",
