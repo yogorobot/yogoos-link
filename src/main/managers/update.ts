@@ -1,6 +1,5 @@
 import { app, BrowserWindow, shell } from 'electron';
 import log from 'electron-log';
-import { autoUpdater, UpdateInfo } from 'electron-updater';
 import { ErrorResponse, SuccessResponse } from '../util';
 
 export type UpdateStatus =
@@ -27,6 +26,11 @@ interface GitHubReleaseAsset {
 }
 
 interface GitHubRelease {
+  tag_name: string;
+  name?: string | null;
+  prerelease?: boolean;
+  html_url?: string;
+  body?: string | null;
   assets?: GitHubReleaseAsset[];
 }
 
@@ -43,29 +47,6 @@ class UpdateManager {
     if (this.initialized) return;
 
     this.initialized = true;
-    autoUpdater.logger = log;
-    autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = false;
-    autoUpdater.allowPrerelease = this.state.isTestingChannel;
-
-    autoUpdater.on('checking-for-update', () => {
-      this.setState({ status: 'checking', error: undefined });
-    });
-
-    autoUpdater.on('update-available', (info) => {
-      this.handleUpdateAvailable(info);
-    });
-
-    autoUpdater.on('update-not-available', (info) => {
-      this.setUpdateInfo('not-available', info);
-    });
-
-    autoUpdater.on('error', (error) => {
-      this.setState({
-        status: 'error',
-        error: UpdateManager.normalizeUpdateError(error),
-      });
-    });
   }
 
   async checkForUpdates(manual = true) {
@@ -80,7 +61,25 @@ class UpdateManager {
 
     try {
       this.setState({ status: 'checking', error: undefined });
-      await autoUpdater.checkForUpdates();
+      const release = await UpdateManager.findLatestAvailableRelease(
+        app.getVersion(),
+        this.state.isTestingChannel,
+      );
+
+      if (!release) {
+        this.setState({
+          status: 'not-available',
+          availableVersion: undefined,
+          releaseName: undefined,
+          releaseNotes: undefined,
+          releaseUrl: undefined,
+          error: undefined,
+          hasRequiredAssets: false,
+        });
+        return new SuccessResponse(this.state);
+      }
+
+      this.setUpdateInfo('available', release);
       return new SuccessResponse(this.state);
     } catch (error) {
       const message = UpdateManager.normalizeUpdateError(error);
@@ -112,41 +111,18 @@ class UpdateManager {
     return new SuccessResponse(this.state);
   }
 
-  private setUpdateInfo(status: UpdateStatus, info: UpdateInfo): void {
+  private setUpdateInfo(status: UpdateStatus, release: GitHubRelease): void {
+    const version = UpdateManager.getVersionFromTag(release.tag_name);
+
     this.setState({
       status,
-      availableVersion: info.version,
-      releaseName: info.releaseName || null,
-      releaseNotes: UpdateManager.stringifyReleaseNotes(info.releaseNotes),
+      availableVersion: version,
+      releaseName: release.name || null,
+      releaseNotes: release.body || null,
       error: undefined,
-      releaseUrl: UpdateManager.getReleaseUrl(info.version),
+      releaseUrl: release.html_url || UpdateManager.getReleaseUrl(version),
       hasRequiredAssets: status === 'available',
     });
-  }
-
-  private async handleUpdateAvailable(info: UpdateInfo): Promise<void> {
-    try {
-      const hasRequiredAssets = await UpdateManager.hasRequiredReleaseAssets(
-        info.version,
-      );
-
-      if (!hasRequiredAssets) {
-        log.warn(`更新 ${info.version} 缺少当前平台所需资源，跳过更新提示`);
-        this.setUpdateInfo('not-available', info);
-        this.setState({ hasRequiredAssets: false });
-        return;
-      }
-
-      this.setUpdateInfo('available', info);
-    } catch (error) {
-      const message = UpdateManager.normalizeUpdateError(
-        error,
-        '更新资源校验失败',
-      );
-      log.warn(`更新 ${info.version} 资源校验失败：${message}`);
-      this.setUpdateInfo('not-available', info);
-      this.setState({ hasRequiredAssets: false });
-    }
   }
 
   private setState(nextState: Partial<AppUpdateState>): void {
@@ -190,12 +166,12 @@ class UpdateManager {
     return message || fallback;
   }
 
-  private static async hasRequiredReleaseAssets(
-    version: string,
-  ): Promise<boolean> {
-    const tag = version.startsWith('v') ? version : `v${version}`;
+  private static async findLatestAvailableRelease(
+    currentVersion: string,
+    allowPrerelease: boolean,
+  ): Promise<GitHubRelease | null> {
     const response = await fetch(
-      `https://api.github.com/repos/yogorobot/yogoos-link/releases/tags/${tag}`,
+      'https://api.github.com/repos/yogorobot/yogoos-link/releases?per_page=30',
       {
         headers: {
           Accept: 'application/vnd.github+json',
@@ -204,12 +180,53 @@ class UpdateManager {
       },
     );
 
-    if (!response.ok) return false;
+    if (!response.ok) {
+      throw new Error(`GitHub Release 查询失败：${response.status}`);
+    }
 
-    const release = (await response.json()) as GitHubRelease;
-    const assetNames = (release.assets || []).map((asset) => asset.name);
+    const releases = (await response.json()) as GitHubRelease[];
 
-    return UpdateManager.hasPlatformAssets(assetNames);
+    return (
+      releases.find((release) => {
+        const version = UpdateManager.getVersionFromTag(release.tag_name);
+        const assetNames = (release.assets || []).map((asset) => asset.name);
+        const isNewer =
+          UpdateManager.compareVersions(version, currentVersion) > 0;
+        const channelMatches = allowPrerelease || !release.prerelease;
+        const hasAssets = UpdateManager.hasPlatformAssets(assetNames);
+
+        if (isNewer && channelMatches && !hasAssets) {
+          log.warn(`更新 ${version} 缺少当前平台所需资源，跳过更新提示`);
+        }
+
+        return isNewer && channelMatches && hasAssets;
+      }) || null
+    );
+  }
+
+  private static getVersionFromTag(tag: string): string {
+    return tag.startsWith('v') ? tag.slice(1) : tag;
+  }
+
+  private static compareVersions(left: string, right: string): number {
+    const leftParts = UpdateManager.getVersionNumbers(left);
+    const rightParts = UpdateManager.getVersionNumbers(right);
+    const length = Math.max(leftParts.length, rightParts.length);
+
+    for (let index = 0; index < length; index += 1) {
+      const diff = (leftParts[index] || 0) - (rightParts[index] || 0);
+      if (diff !== 0) return diff;
+    }
+
+    return 0;
+  }
+
+  private static getVersionNumbers(version: string): number[] {
+    return version
+      .replace(/^v/, '')
+      .split(/[^0-9]+/)
+      .filter(Boolean)
+      .map((part) => Number(part) || 0);
   }
 
   private static hasPlatformAssets(assetNames: string[]): boolean {
@@ -249,14 +266,6 @@ class UpdateManager {
   private static getReleaseUrl(version: string): string {
     const tag = version.startsWith('v') ? version : `v${version}`;
     return `https://github.com/yogorobot/yogoos-link/releases/tag/${tag}`;
-  }
-
-  private static stringifyReleaseNotes(
-    releaseNotes: UpdateInfo['releaseNotes'],
-  ): string | null {
-    if (!releaseNotes) return null;
-    if (typeof releaseNotes === 'string') return releaseNotes;
-    return releaseNotes.map((note) => note.note).join('\n');
   }
 }
 

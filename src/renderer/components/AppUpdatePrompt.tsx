@@ -61,13 +61,6 @@ export default function AppUpdatePrompt() {
               {`发现 ${availableVersion}`}
             </h2>
           </div>
-          <button
-            type="button"
-            className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400 transition hover:border-slate-500 hover:text-slate-100"
-            onClick={() => setIsHidden(true)}
-          >
-            稍后
-          </button>
         </div>
 
         <div className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
