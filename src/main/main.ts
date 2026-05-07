@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 import log from 'electron-log';
 import { windowManager, sshManager, updateManager } from './managers';
 import IPCEventsV2 from './events';
@@ -27,7 +27,10 @@ app.on('window-all-closed', () => {
   //   return;
   // }
 
-  // Windows/Linux 默认会退出应用。若当前正在切回登录窗口流程，避免立刻退出
+  if (windowManager.isMainWindowHiddenToTray()) {
+    return;
+  }
+
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -48,16 +51,10 @@ app
     updateManager.initialize();
     updateManager.checkForUpdates(false);
     app.on('activate', () => {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
       const connectionsWindow = windowManager.getConnectionsWindow();
       if (connectionsWindow) {
-        if (connectionsWindow.isMinimized()) {
-          connectionsWindow.restore();
-        }
-        connectionsWindow.show();
-        connectionsWindow.focus();
-      } else if (BrowserWindow.getAllWindows().length === 0) {
+        windowManager.showConnectionsWindow();
+      } else {
         windowManager.createConnectionsWindow();
       }
       return null;

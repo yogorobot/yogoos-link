@@ -2,6 +2,8 @@ import {
   app,
   BrowserWindow,
   BrowserWindowConstructorOptions,
+  Menu,
+  Tray,
   shell,
   screen,
 } from 'electron';
@@ -20,6 +22,8 @@ class WindowManager {
   private windowConnections: Map<number, string> = new Map();
 
   private isQuitting = false;
+
+  private tray: Tray | null = null;
 
   async createConnectionsWindow(
     opt?: BrowserWindowConstructorOptions,
@@ -43,14 +47,31 @@ class WindowManager {
       if (this.isQuitting) return;
 
       event.preventDefault();
-      this.connectionsWindow.minimize();
+      this.connectionsWindow.hide();
     });
+    this.createTray();
 
     return this.connectionsWindow;
   }
 
   setQuitting(isQuitting: boolean): void {
     this.isQuitting = isQuitting;
+  }
+
+  showConnectionsWindow(): void {
+    const connectionsWindow = this.getConnectionsWindow();
+    if (!connectionsWindow) return;
+
+    if (connectionsWindow.isMinimized()) {
+      connectionsWindow.restore();
+    }
+    connectionsWindow.show();
+    connectionsWindow.focus();
+  }
+
+  isMainWindowHiddenToTray(): boolean {
+    const connectionsWindow = this.getConnectionsWindow();
+    return Boolean(connectionsWindow && !connectionsWindow.isVisible());
   }
 
   async createChildWindow(
@@ -244,6 +265,34 @@ class WindowManager {
     if (!connectionId) {
       this.childWindows.clear();
     }
+  }
+
+  private createTray(): void {
+    if (this.tray) return;
+
+    const trayIconPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'assets', 'tray.png')
+      : path.join(__dirname, '../../assets/tray.png');
+
+    this.tray = new Tray(trayIconPath);
+    this.tray.setToolTip('YOLINK');
+    this.tray.setContextMenu(
+      Menu.buildFromTemplate([
+        {
+          label: '显示主窗口',
+          click: () => this.showConnectionsWindow(),
+        },
+        { type: 'separator' },
+        {
+          label: '退出',
+          click: () => {
+            this.setQuitting(true);
+            app.quit();
+          },
+        },
+      ]),
+    );
+    this.tray.on('click', () => this.showConnectionsWindow());
   }
 }
 
