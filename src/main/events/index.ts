@@ -351,8 +351,9 @@ class IPCEventsV2 {
   static registerUpdateEvents() {
     ipcMain.handle('update:get-state', () => updateManager.getState());
     ipcMain.handle('update:check', () => updateManager.checkForUpdates(true));
-    ipcMain.handle('update:download', () => updateManager.downloadUpdate());
-    ipcMain.handle('update:install', () => updateManager.installUpdate());
+    ipcMain.handle('update:open-download-page', () =>
+      updateManager.openDownloadPage(),
+    );
   }
 }
 

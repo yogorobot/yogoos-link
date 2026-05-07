@@ -1,6 +1,6 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import log from 'electron-log';
-import { autoUpdater, ProgressInfo, UpdateInfo } from 'electron-updater';
+import { autoUpdater, UpdateInfo } from 'electron-updater';
 import { ErrorResponse, SuccessResponse } from '../util';
 
 export type UpdateStatus =
@@ -8,8 +8,6 @@ export type UpdateStatus =
   | 'checking'
   | 'available'
   | 'not-available'
-  | 'downloading'
-  | 'downloaded'
   | 'error';
 
 export interface AppUpdateState {
@@ -18,7 +16,7 @@ export interface AppUpdateState {
   availableVersion?: string;
   releaseName?: string | null;
   releaseNotes?: string | null;
-  progress?: number;
+  releaseUrl?: string;
   error?: string;
   hasRequiredAssets?: boolean;
   isTestingChannel: boolean;
@@ -62,14 +60,6 @@ class UpdateManager {
       this.setUpdateInfo('not-available', info);
     });
 
-    autoUpdater.on('download-progress', (progress) => {
-      this.setDownloadProgress(progress);
-    });
-
-    autoUpdater.on('update-downloaded', (info) => {
-      this.setUpdateInfo('downloaded', info, 100);
-    });
-
     autoUpdater.on('error', (error) => {
       this.setState({
         status: 'error',
@@ -99,52 +89,38 @@ class UpdateManager {
     }
   }
 
-  async downloadUpdate() {
+  async openDownloadPage() {
     this.initialize();
 
-    if (this.state.status !== 'available') {
-      return new ErrorResponse('当前没有可下载的更新');
+    if (!this.state.releaseUrl) {
+      return new ErrorResponse('当前没有可打开的下载页面');
     }
 
     try {
-      this.setState({ status: 'downloading', progress: 0, error: undefined });
-      await autoUpdater.downloadUpdate();
-      return new SuccessResponse(this.state);
+      await shell.openExternal(this.state.releaseUrl);
+      return new SuccessResponse(null);
     } catch (error) {
-      const message = UpdateManager.normalizeUpdateError(error, '更新下载失败');
-      this.setState({ status: 'error', error: message });
+      const message = UpdateManager.normalizeUpdateError(
+        error,
+        '打开下载页面失败',
+      );
       return new ErrorResponse(message);
     }
-  }
-
-  installUpdate() {
-    this.initialize();
-
-    if (this.state.status !== 'downloaded') {
-      return new ErrorResponse('更新尚未下载完成');
-    }
-
-    autoUpdater.quitAndInstall(false, true);
-    return new SuccessResponse(null);
   }
 
   getState() {
     return new SuccessResponse(this.state);
   }
 
-  private setUpdateInfo(
-    status: UpdateStatus,
-    info: UpdateInfo,
-    progress?: number,
-  ): void {
+  private setUpdateInfo(status: UpdateStatus, info: UpdateInfo): void {
     this.setState({
       status,
       availableVersion: info.version,
       releaseName: info.releaseName || null,
       releaseNotes: UpdateManager.stringifyReleaseNotes(info.releaseNotes),
-      progress,
       error: undefined,
-      hasRequiredAssets: status === 'available' || status === 'downloaded',
+      releaseUrl: UpdateManager.getReleaseUrl(info.version),
+      hasRequiredAssets: status === 'available',
     });
   }
 
@@ -171,14 +147,6 @@ class UpdateManager {
       this.setUpdateInfo('not-available', info);
       this.setState({ hasRequiredAssets: false });
     }
-  }
-
-  private setDownloadProgress(progress: ProgressInfo): void {
-    this.setState({
-      status: 'downloading',
-      progress: Math.round(progress.percent),
-      error: undefined,
-    });
   }
 
   private setState(nextState: Partial<AppUpdateState>): void {
@@ -276,6 +244,11 @@ class UpdateManager {
     }
 
     return false;
+  }
+
+  private static getReleaseUrl(version: string): string {
+    const tag = version.startsWith('v') ? version : `v${version}`;
+    return `https://github.com/yogorobot/yogoos-link/releases/tag/${tag}`;
   }
 
   private static stringifyReleaseNotes(

@@ -80,7 +80,6 @@
     }
   },
   "dependencies": {
-    "@electron/notarize": "^3.0.0",
     "@xterm/addon-canvas": "^0.7.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-search": "^0.15.0",
@@ -182,7 +181,6 @@
     "productName": "Yolink",
     "appId": "com.yogo.yolink",
     "asar": true,
-    "afterSign": ".erb/scripts/notarize.js",
     "asarUnpack": [
       "**\\*.{node,dll}",
       "**/node_modules/**/*"

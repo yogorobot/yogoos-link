@@ -60,8 +60,7 @@ type NotificationChannels =
 type UpdateChannels =
   | 'update:get-state'
   | 'update:check'
-  | 'update:download'
-  | 'update:install'
+  | 'update:open-download-page'
   | 'update:event';
 
 type Channels =

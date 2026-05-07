@@ -5,8 +5,6 @@ export type UpdateStatus =
   | 'checking'
   | 'available'
   | 'not-available'
-  | 'downloading'
-  | 'downloaded'
   | 'error';
 
 export interface AppUpdateState {
@@ -15,8 +13,9 @@ export interface AppUpdateState {
   availableVersion?: string;
   releaseName?: string | null;
   releaseNotes?: string | null;
-  progress?: number;
+  releaseUrl?: string;
   error?: string;
+  hasRequiredAssets?: boolean;
   isTestingChannel: boolean;
 }
 
@@ -29,19 +28,14 @@ export const useAutoUpdate = () => {
     return window.electron.ipcRenderer.invoke('update:check');
   }, []);
 
-  const downloadUpdate = useCallback(() => {
-    return window.electron.ipcRenderer.invoke('update:download');
-  }, []);
-
-  const installUpdate = useCallback(() => {
-    return window.electron.ipcRenderer.invoke('update:install');
+  const openDownloadPage = useCallback(() => {
+    return window.electron.ipcRenderer.invoke('update:open-download-page');
   }, []);
 
   return {
     getUpdateState,
     checkForUpdates,
-    downloadUpdate,
-    installUpdate,
+    openDownloadPage,
   };
 };
 

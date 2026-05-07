@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'
-      - 'testing-v*.*.*'
   workflow_dispatch:
     inputs:
       channel:
@@ -35,7 +34,7 @@ jobs:
             VERSION="${{ inputs.version }}"
             CHANNEL="${{ inputs.channel }}"
             if [ "$CHANNEL" = "testing" ]; then
-              TAG="testing-v${VERSION#v}"
+              TAG="v${VERSION#v}"
               PRERELEASE="true"
               NAME="Testing ${TAG}"
             else
@@ -110,7 +109,12 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Package macOS application
+        if: runner.os == 'macOS'
+        run: npx electron-builder build --publish never ${{ matrix.platform_flag }}
+
       - name: Package application
+        if: runner.os != 'macOS'
         run: npx electron-builder build --publish never ${{ matrix.platform_flag }}
 
       - name: Upload to Release
