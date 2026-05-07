@@ -26,6 +26,11 @@ export type PublicSSHCredentials = Omit<
   'password' | 'jumpPassword'
 >;
 
+export interface ActiveSSHConnectionInfo {
+  connectionId: string;
+  credentials: PublicSSHCredentials;
+}
+
 export interface TunnelOptions {
   localHost?: string;
   localPort: number;
@@ -314,6 +319,16 @@ export class SSHAuthManager {
       jumpAuthType,
       jumpKeyFilePath,
     };
+  }
+
+  public getActiveConnections(): ActiveSSHConnectionInfo[] {
+    return Array.from(this.connections.keys())
+      .map((connectionId) => {
+        const credentials = this.getPublicCredentials(connectionId);
+        if (!credentials) return null;
+        return { connectionId, credentials };
+      })
+      .filter(Boolean) as ActiveSSHConnectionInfo[];
   }
 
   public getConnection(connectionId: string): SSH2Client {

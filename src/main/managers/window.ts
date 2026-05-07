@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   BrowserWindowConstructorOptions,
   Menu,
+  MenuItemConstructorOptions,
   Tray,
   shell,
   screen,
@@ -13,6 +14,7 @@ import log from 'electron-log';
 import { resolveHtmlPath } from '../util';
 import MenuBuilder from '../menu';
 import sshManager from './ssh';
+import type { ActiveSSHConnectionInfo, PublicSSHCredentials } from './ssh';
 
 class WindowManager {
   public connectionsWindow: BrowserWindow = null;
@@ -121,6 +123,14 @@ class WindowManager {
     }
 
     return 'YOLINK';
+  }
+
+  private static getConnectionLabel(credentials: PublicSSHCredentials): string {
+    const target = `${credentials.username}@${credentials.host}:${credentials.port}`;
+    if (credentials.useJumpHost && credentials.jumpHost) {
+      return `${credentials.jumpHost} -> ${target}`;
+    }
+    return target;
   }
 
   private async createWindow(
@@ -276,23 +286,57 @@ class WindowManager {
 
     this.tray = new Tray(trayIconPath);
     this.tray.setToolTip('YOLINK');
-    this.tray.setContextMenu(
-      Menu.buildFromTemplate([
-        {
-          label: '显示主窗口',
-          click: () => this.showConnectionsWindow(),
+    this.tray.setContextMenu(this.buildTrayMenu());
+    this.tray.on('click', () => this.showTrayMenu());
+    this.tray.on('right-click', () => this.showTrayMenu());
+  }
+
+  private buildTrayMenu(): Menu {
+    const activeConnections = sshManager.getActiveConnections();
+    const connectionItems = this.buildTrayConnectionItems(activeConnections);
+
+    return Menu.buildFromTemplate([
+      ...connectionItems,
+      { type: 'separator' },
+      {
+        label: '显示主窗口',
+        click: () => this.showConnectionsWindow(),
+      },
+      { type: 'separator' },
+      {
+        label: '退出',
+        click: () => {
+          this.setQuitting(true);
+          app.quit();
         },
-        { type: 'separator' },
-        {
-          label: '退出',
-          click: () => {
-            this.setQuitting(true);
-            app.quit();
-          },
-        },
-      ]),
-    );
-    this.tray.on('click', () => this.showConnectionsWindow());
+      },
+    ]);
+  }
+
+  private buildTrayConnectionItems(
+    activeConnections: ActiveSSHConnectionInfo[],
+  ): MenuItemConstructorOptions[] {
+    if (activeConnections.length === 0) {
+      return [{ label: '暂无已连接设备', enabled: false }];
+    }
+
+    return activeConnections.map(({ connectionId, credentials }) => ({
+      label: WindowManager.getConnectionLabel(credentials),
+      click: () => this.selectConnectionFromTray(connectionId),
+    }));
+  }
+
+  private showTrayMenu(): void {
+    if (!this.tray) return;
+    this.tray.popUpContextMenu(this.buildTrayMenu());
+  }
+
+  private selectConnectionFromTray(connectionId: string): void {
+    this.showConnectionsWindow();
+    const connectionsWindow = this.getConnectionsWindow();
+    connectionsWindow?.webContents.send('ssh:select-connection', {
+      connectionId,
+    });
   }
 }
 

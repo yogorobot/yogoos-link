@@ -36,7 +36,8 @@ type LogChannels =
 type SSHChannels =
   | 'ssh:authenticate'
   | 'ssh:disconnect-by-id'
-  | 'ssh:connection-closed';
+  | 'ssh:connection-closed'
+  | 'ssh:select-connection';
 
 type FileChannels = 'file:show-open-dialog';
 

@@ -104,6 +104,25 @@ export default function SshConnections() {
     return unsubscribe;
   }, [showToastWarning, showWarning]);
 
+  useEffect(() => {
+    const unsubscribe = window.electron.ipcRenderer.on(
+      'ssh:select-connection',
+      (payload) => {
+        const selectedConnectionPayload = payload as { connectionId: string };
+        const matchedConnection = Object.entries(activeConnections).find(
+          ([, connection]) =>
+            connection.connectionId === selectedConnectionPayload.connectionId,
+        );
+        if (!matchedConnection) return;
+
+        setSelectedRecordId(matchedConnection[0]);
+        setIsSidebarOpen(false);
+      },
+    );
+
+    return unsubscribe;
+  }, [activeConnections]);
+
   const persistRecords = (nextRecords: SshConnectionRecord[]) => {
     const uniqueRecords = dedupeConnections(nextRecords);
     setRecords(uniqueRecords);
