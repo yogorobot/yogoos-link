@@ -63,8 +63,8 @@ export default function AppUpdatePrompt() {
   };
 
   return (
-    <div className="yogo-modal-overlay z-[70] grid place-items-center bg-slate-950/70 px-6 py-8 backdrop-blur-sm [-webkit-app-region:no-drag] max-sm:px-3 max-sm:py-4">
-      <section className="yogo-panel w-full max-w-lg rounded-3xl p-6 text-slate-100 [-webkit-app-region:no-drag] max-sm:p-5">
+    <div className="yogo-modal-overlay z-[70] grid place-items-center overflow-y-auto bg-slate-950/70 px-6 py-8 backdrop-blur-sm [-webkit-app-region:no-drag] max-sm:place-items-start max-sm:px-3 max-sm:py-4">
+      <section className="yogo-panel my-auto max-h-full w-full max-w-lg overflow-y-auto rounded-3xl p-6 text-slate-100 [-webkit-app-region:no-drag] max-sm:my-0 max-sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-300/80">
@@ -94,7 +94,7 @@ export default function AppUpdatePrompt() {
             </div>
           )}
           {isError && (
-            <p className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-red-200">
+            <p className="max-h-40 overflow-y-auto break-words rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-red-200">
               {updateState?.error || '更新失败'}
             </p>
           )}

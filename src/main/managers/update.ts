@@ -64,7 +64,7 @@ class UpdateManager {
     autoUpdater.on('error', (error) => {
       this.setState({
         status: 'error',
-        error: error.message || '更新检查失败',
+        error: UpdateManager.normalizeUpdateError(error),
       });
     });
   }
@@ -84,7 +84,7 @@ class UpdateManager {
       await autoUpdater.checkForUpdates();
       return new SuccessResponse(this.state);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '更新检查失败';
+      const message = UpdateManager.normalizeUpdateError(error);
       this.setState({ status: 'error', error: message });
       return new ErrorResponse(message);
     }
@@ -102,7 +102,7 @@ class UpdateManager {
       await autoUpdater.downloadUpdate();
       return new SuccessResponse(this.state);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '更新下载失败';
+      const message = UpdateManager.normalizeUpdateError(error, '更新下载失败');
       this.setState({ status: 'error', error: message });
       return new ErrorResponse(message);
     }
@@ -164,6 +164,27 @@ class UpdateManager {
 
   private static isTestingVersion(version: string): boolean {
     return version.includes('testing');
+  }
+
+  private static normalizeUpdateError(
+    error: unknown,
+    fallback = '更新检查失败',
+  ): string {
+    const message =
+      error instanceof Error ? error.message : String(error || '');
+
+    if (
+      message.includes('releases.atom') &&
+      (message.includes('404') || message.includes('authentication token'))
+    ) {
+      return '更新源不可访问：GitHub Release 需要允许匿名访问。私有仓库不能直接用于客户端自动更新，请改用公开 Release 或公开更新源。';
+    }
+
+    if (message.includes('Please check update first')) {
+      return '更新信息未准备好，请稍后重新检查更新。';
+    }
+
+    return message || fallback;
   }
 
   private static stringifyReleaseNotes(
