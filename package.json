@@ -243,6 +243,11 @@
       "buildResources": "assets",
       "output": "release/build"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "yogorobot",
+      "repo": "yogoos-link"
+    },
     "extraResources": [
       "./assets/**"
     ]

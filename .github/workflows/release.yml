@@ -124,3 +124,4 @@ jobs:
             release/build/*.AppImage
             release/build/*.deb
             release/build/*.yml
+            release/build/*.blockmap

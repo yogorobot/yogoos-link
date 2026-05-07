@@ -4,7 +4,7 @@ import Window from './window';
 import Logs from './logs';
 import System from './system';
 import { SSHCredentials } from '../managers/ssh';
-import { sshManager, windowManager } from '../managers';
+import { sshManager, updateManager, windowManager } from '../managers';
 import AppUpdater, { IAppUpdateOptions } from './app-update';
 import AppSwitcher, { IAppSwitcherOptions } from './switch-app';
 import Package from './package';
@@ -89,6 +89,7 @@ class IPCEventsV2 {
     this.registerNotificationEvents();
     this.registerSystemEvents();
     this.registerPackageEvents();
+    IPCEventsV2.registerUpdateEvents();
     IPCEventsV2.registerSSHConnectionLifecycle();
   }
 
@@ -345,6 +346,13 @@ class IPCEventsV2 {
         NotificationManager,
       ).checkPermission();
     });
+  }
+
+  static registerUpdateEvents() {
+    ipcMain.handle('update:get-state', () => updateManager.getState());
+    ipcMain.handle('update:check', () => updateManager.checkForUpdates(true));
+    ipcMain.handle('update:download', () => updateManager.downloadUpdate());
+    ipcMain.handle('update:install', () => updateManager.installUpdate());
   }
 }
 

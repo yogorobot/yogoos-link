@@ -6,6 +6,7 @@ import { useFile } from './useFile';
 import { useApp } from './useApp';
 import { useNotification } from './useNotification';
 import { useSystem } from './useSystem';
+import { useAutoUpdate } from './useAutoUpdate';
 
 export {
   useWindow,
@@ -16,4 +17,5 @@ export {
   useApp,
   useNotification,
   useSystem,
+  useAutoUpdate,
 };

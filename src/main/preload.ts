@@ -57,6 +57,13 @@ type NotificationChannels =
   | 'notification:show'
   | 'notification:check-permission';
 
+type UpdateChannels =
+  | 'update:get-state'
+  | 'update:check'
+  | 'update:download'
+  | 'update:install'
+  | 'update:event';
+
 type Channels =
   | WindowChannels
   | LogChannels
@@ -65,6 +72,7 @@ type Channels =
   | AppChannels
   | DebugChannels
   | NotificationChannels
+  | UpdateChannels
   | SystemChannels
   | PackageChannels;
 

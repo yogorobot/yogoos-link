@@ -1,6 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import log from 'electron-log';
-import { windowManager, sshManager } from './managers';
+import { windowManager, sshManager, updateManager } from './managers';
 import IPCEventsV2 from './events';
 
 // 应用退出时的资源清理
@@ -44,6 +44,8 @@ app
   .then(() => {
     const ipcEvents = new IPCEventsV2();
     windowManager.createConnectionsWindow();
+    updateManager.initialize();
+    updateManager.checkForUpdates(false);
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
