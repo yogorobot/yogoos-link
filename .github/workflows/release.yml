@@ -85,13 +85,14 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            platform_flag: '--mac --arm64'
-          - os: macos-latest
-            platform_flag: '--mac --x64'
+            platform_flag: '--mac --arm64 --x64'
+            artifact_name: macos
           - os: windows-latest
             platform_flag: '-w'
+            artifact_name: windows
           - os: ubuntu-latest
             platform_flag: '-l'
+            artifact_name: linux
 
     steps:
       - name: Checkout code
@@ -117,15 +118,46 @@ jobs:
         if: runner.os != 'macOS'
         run: npx electron-builder build --publish never ${{ matrix.platform_flag }}
 
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ needs.prepare.outputs.release_tag }}
-          files: |
+          name: release-${{ matrix.artifact_name }}
+          path: |
             release/build/*.dmg
             release/build/*.zip
             release/build/*.exe
             release/build/*.AppImage
             release/build/*.deb
-            release/build/*.yml
+            release/build/latest.yml
+            release/build/latest-mac.yml
+            release/build/latest-linux.yml
             release/build/*.blockmap
+          if-no-files-found: ignore
+
+  publish-release-assets:
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Upload assets to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          files: |
+            release-artifacts/**/*.dmg
+            release-artifacts/**/*.zip
+            release-artifacts/**/*.exe
+            release-artifacts/**/*.AppImage
+            release-artifacts/**/*.deb
+            release-artifacts/**/latest.yml
+            release-artifacts/**/latest-mac.yml
+            release-artifacts/**/latest-linux.yml
+            release-artifacts/**/*.blockmap
