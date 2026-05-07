@@ -286,7 +286,6 @@ class WindowManager {
 
     this.tray = new Tray(trayIconPath);
     this.tray.setToolTip('YOLINK');
-    this.tray.setContextMenu(this.buildTrayMenu());
     this.tray.on('click', () => this.showTrayMenu());
     this.tray.on('right-click', () => this.showTrayMenu());
   }
@@ -328,7 +327,8 @@ class WindowManager {
 
   private showTrayMenu(): void {
     if (!this.tray) return;
-    this.tray.popUpContextMenu(this.buildTrayMenu());
+    const trayMenu = this.buildTrayMenu();
+    this.tray.popUpContextMenu(trayMenu);
   }
 
   private selectConnectionFromTray(connectionId: string): void {
