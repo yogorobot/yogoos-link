@@ -363,7 +363,7 @@ export default function SshConnections() {
       </section>
 
       {showForm && (
-        <div className="yogo-modal-overlay z-50 flex items-start justify-center overflow-y-auto bg-slate-950/70 px-6 py-8 backdrop-blur-sm [-webkit-app-region:no-drag] max-sm:px-3 max-sm:py-4">
+        <div className="yogo-modal-overlay z-50 grid place-items-center overflow-y-auto bg-slate-950/70 px-6 py-8 backdrop-blur-sm [-webkit-app-region:no-drag] max-sm:px-3 max-sm:py-4">
           <div className="yogo-panel w-full max-w-3xl rounded-3xl [-webkit-app-region:no-drag]">
             <SshConnectionForm
               values={formValues}
