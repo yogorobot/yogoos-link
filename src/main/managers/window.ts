@@ -51,6 +51,9 @@ class WindowManager {
       event.preventDefault();
       this.connectionsWindow.hide();
     });
+    this.connectionsWindow.once('closed', () => {
+      this.connectionsWindow = null;
+    });
     this.createTray();
 
     return this.connectionsWindow;
@@ -74,6 +77,20 @@ class WindowManager {
   isMainWindowHiddenToTray(): boolean {
     const connectionsWindow = this.getConnectionsWindow();
     return Boolean(connectionsWindow && !connectionsWindow.isVisible());
+  }
+
+  prepareForQuit(): void {
+    this.setQuitting(true);
+    this.closeChildWindows();
+    this.destroyTray();
+
+    const connectionsWindow = this.getConnectionsWindow();
+    if (connectionsWindow) {
+      connectionsWindow.destroy();
+      this.connectionsWindow = null;
+    }
+
+    this.windowConnections.clear();
   }
 
   async createChildWindow(
@@ -277,6 +294,13 @@ class WindowManager {
     }
   }
 
+  destroyTray(): void {
+    if (!this.tray) return;
+
+    this.tray.destroy();
+    this.tray = null;
+  }
+
   private createTray(): void {
     if (this.tray) return;
 
@@ -305,7 +329,7 @@ class WindowManager {
       {
         label: '退出',
         click: () => {
-          this.setQuitting(true);
+          this.prepareForQuit();
           app.quit();
         },
       },

@@ -36,7 +36,7 @@ export default function SshConnectionForm({
   const shouldShowHostOptions = isHostFocused && filteredHostOptions.length > 0;
 
   const inputClassName = (field: keyof ConnectionFormValues) =>
-    `yogo-input rounded-xl px-3 py-2.5 transition ${
+    `yogo-input w-full rounded-xl px-3 py-2.5 transition ${
       errors[field]
         ? 'border-red-400/70 focus:border-red-400 focus:ring-red-500/30'
         : ''
@@ -92,34 +92,36 @@ export default function SshConnectionForm({
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-        <div className="relative grid gap-1.5 text-sm font-medium text-slate-300">
+        <div className="grid gap-1.5 text-sm font-medium text-slate-300">
           <label htmlFor="ssh-host-input">主机</label>
-          <input
-            id="ssh-host-input"
-            className={inputClassName('host')}
-            name="host"
-            value={values.host}
-            onChange={updateField}
-            onFocus={() => setIsHostFocused(true)}
-            onBlur={() => setIsHostFocused(false)}
-            placeholder="192.168.1.10"
-            autoComplete="off"
-          />
+          <div className="relative">
+            <input
+              id="ssh-host-input"
+              className={inputClassName('host')}
+              name="host"
+              value={values.host}
+              onChange={updateField}
+              onFocus={() => setIsHostFocused(true)}
+              onBlur={() => setIsHostFocused(false)}
+              placeholder="192.168.1.10"
+              autoComplete="off"
+            />
+            {shouldShowHostOptions && (
+              <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-48 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-1 shadow-xl shadow-slate-950/70">
+                {filteredHostOptions.map((host) => (
+                  <button
+                    key={host}
+                    type="button"
+                    className="block w-full break-all rounded-xl px-3 py-2 text-left text-sm font-medium leading-5 text-slate-200 transition hover:bg-blue-500/15 hover:text-blue-200"
+                    onMouseDown={(event) => selectHost(host, event)}
+                  >
+                    {host}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {renderError('host')}
-          {shouldShowHostOptions && (
-            <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-48 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-1 shadow-xl shadow-slate-950/70">
-              {filteredHostOptions.map((host) => (
-                <button
-                  key={host}
-                  type="button"
-                  className="block w-full break-all rounded-xl px-3 py-2 text-left text-sm font-medium leading-5 text-slate-200 transition hover:bg-blue-500/15 hover:text-blue-200"
-                  onMouseDown={(event) => selectHost(host, event)}
-                >
-                  {host}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <label className="grid gap-1.5 text-sm font-medium text-slate-300">
           <span>端口</span>

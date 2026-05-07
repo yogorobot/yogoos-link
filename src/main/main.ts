@@ -3,11 +3,17 @@ import log from 'electron-log';
 import { windowManager, sshManager, updateManager } from './managers';
 import IPCEventsV2 from './events';
 
+let hasCleanedUp = false;
+
 // 应用退出时的资源清理
 const cleanupAndExit = () => {
+  if (hasCleanedUp) return;
+  hasCleanedUp = true;
+
   log.info('应用退出清理开始...');
 
   try {
+    windowManager.prepareForQuit();
     sshManager.removeAllConnections();
 
     log.info('资源清理完成');
@@ -17,6 +23,10 @@ const cleanupAndExit = () => {
 };
 
 app.on('window-all-closed', () => {
+  if (windowManager.isMainWindowHiddenToTray()) {
+    return;
+  }
+
   // 应用退出时清理所有资源
   log.info('所有窗口已关闭，清理资源...');
   cleanupAndExit();
@@ -27,10 +37,6 @@ app.on('window-all-closed', () => {
   //   return;
   // }
 
-  if (windowManager.isMainWindowHiddenToTray()) {
-    return;
-  }
-
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -38,7 +44,6 @@ app.on('window-all-closed', () => {
 
 // 应用退出前清理资源
 app.on('before-quit', () => {
-  windowManager.setQuitting(true);
   log.info('应用退出前清理资源...');
   cleanupAndExit();
 });
