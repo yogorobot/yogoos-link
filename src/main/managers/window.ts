@@ -19,11 +19,17 @@ class WindowManager {
 
   private windowConnections: Map<number, string> = new Map();
 
+  private isQuitting = false;
+
   async createConnectionsWindow(
     opt?: BrowserWindowConstructorOptions,
   ): Promise<BrowserWindow> {
     const isExistsWindow = this.getConnectionsWindow();
     if (isExistsWindow) {
+      if (isExistsWindow.isMinimized()) {
+        isExistsWindow.restore();
+      }
+      isExistsWindow.show();
       isExistsWindow.focus();
       return isExistsWindow;
     }
@@ -33,8 +39,18 @@ class WindowManager {
       titleBarStyle: 'hiddenInset',
       ...opt,
     });
+    this.connectionsWindow.on('close', (event) => {
+      if (this.isQuitting) return;
+
+      event.preventDefault();
+      this.connectionsWindow.minimize();
+    });
 
     return this.connectionsWindow;
+  }
+
+  setQuitting(isQuitting: boolean): void {
+    this.isQuitting = isQuitting;
   }
 
   async createChildWindow(

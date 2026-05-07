@@ -35,6 +35,7 @@ app.on('window-all-closed', () => {
 
 // 应用退出前清理资源
 app.on('before-quit', () => {
+  windowManager.setQuitting(true);
   log.info('应用退出前清理资源...');
   cleanupAndExit();
 });
@@ -49,7 +50,14 @@ app
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
-      if (BrowserWindow.getAllWindows().length === 0) {
+      const connectionsWindow = windowManager.getConnectionsWindow();
+      if (connectionsWindow) {
+        if (connectionsWindow.isMinimized()) {
+          connectionsWindow.restore();
+        }
+        connectionsWindow.show();
+        connectionsWindow.focus();
+      } else if (BrowserWindow.getAllWindows().length === 0) {
         windowManager.createConnectionsWindow();
       }
       return null;
