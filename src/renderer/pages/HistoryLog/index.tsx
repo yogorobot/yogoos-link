@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import StreamView from '../../components/StreamView';
+import WindowTitlebar from '../../components/WindowTitlebar';
 import { useLog } from '../../hooks';
 import { FilterOptions } from '../../components/StreamView/LogFilter';
 
@@ -49,7 +50,7 @@ const Index = () => {
       const logs = await getHistoryLogList();
 
       if (!logs || logs.length === 0) {
-        setError('未找到日志文件，请检查SSH连接状态');
+        setError('未找到日志文件，请检查连接状态');
         setLogList([]);
         setSelectedFile(null);
       } else {
@@ -65,7 +66,7 @@ const Index = () => {
         errorMsg.includes('SSH连接未建立') ||
         errorMsg.includes('No response from server')
       ) {
-        setError('SSH连接已断开，请重新建立连接');
+        setError('连接已断开，请重新建立连接');
       } else if (errorMsg.includes('EADDRNOTAVAIL')) {
         setError('网络连接不可用，请检查网络设置');
       } else {
@@ -97,12 +98,13 @@ const Index = () => {
   }, [selectedFile, filters, time]);
 
   return (
-    <div className="w-full h-full bg-gray-900/85 backdrop-blur-xl flex">
-      <div className="flex h-full w-full min-h-0">
+    <div className="yogo-page flex h-full w-full flex-col backdrop-blur-xl">
+      <WindowTitlebar fallbackTitle="历史日志" />
+      <div className="flex min-h-0 flex-1 w-full [-webkit-app-region:no-drag] max-md:flex-col">
         {/* 左侧文件列表 - 可折叠 */}
         <div
           className={`flex-shrink-0 bg-white/5 border-r border-white/10 flex flex-col h-full backdrop-blur-sm transition-all duration-300 ease-in-out overflow-hidden ${
-            sidebarCollapsed ? 'w-0' : 'w-80'
+            sidebarCollapsed ? 'w-0' : 'w-80 max-md:h-72 max-md:w-full'
           }`}
         >
           {/* 头部标题 */}
@@ -253,7 +255,7 @@ const Index = () => {
                 </h3>
                 <p className="text-sm text-white/70 mb-6">
                   {error
-                    ? '请检查SSH连接状态'
+                    ? '请检查连接状态'
                     : '从左侧列表中选择一个日志文件来查看内容'}
                 </p>
               </div>

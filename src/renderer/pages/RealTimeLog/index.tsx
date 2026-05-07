@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import StreamView from '../../components/StreamView';
+import WindowTitlebar from '../../components/WindowTitlebar';
 import { useLog } from '../../hooks';
 import { FilterOptions } from '../../components/StreamView/LogFilter';
 
@@ -56,7 +57,8 @@ const Index = () => {
   }, [selectedFile, filters, time]);
 
   return (
-    <div className="relative w-full h-full flex flex-col min-h-0">
+    <div className="yogo-page relative flex h-full min-h-0 w-full flex-col">
+      <WindowTitlebar fallbackTitle="实时日志" />
       {requestId && (
         <StreamView
           key={requestId}

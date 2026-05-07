@@ -25,8 +25,14 @@ const setFilePermissions = (filePath: string) => `sudo chmod 666 ${filePath}`;
 class AppSwitcher {
   private window: BrowserWindow;
 
-  constructor(windowId: number) {
+  private connectionId: string;
+
+  constructor(windowId: number, connectionId?: string) {
     this.window = BrowserWindow.fromId(windowId) as BrowserWindow;
+    if (!connectionId) {
+      throw new Error('应用切换窗口没有绑定连接');
+    }
+    this.connectionId = connectionId;
     this.window.once('closed', () => {
       // 清理引用
       this.window = null;
@@ -57,10 +63,14 @@ class AppSwitcher {
 
     try {
       // Set file permissions for config.json
-      await sshManager.executeCommand(setFilePermissions(configPath));
+      await sshManager.executeCommand(
+        this.connectionId,
+        setFilePermissions(configPath),
+      );
 
       // Read current config
       const currentConfig = await sshManager.executeCommand(
+        this.connectionId,
         `cat ${configPath}`,
       );
       const config = JSON.parse(currentConfig);
@@ -72,6 +82,7 @@ class AppSwitcher {
       const updatedConfigJson = JSON.stringify(config, null, 2);
 
       await sshManager.executeCommand(
+        this.connectionId,
         `echo '${updatedConfigJson}' > ${configPath}`,
       );
 
@@ -99,7 +110,10 @@ class AppSwitcher {
       });
 
       // Restart luna service
-      await sshManager.executeCommand('sudo systemctl restart luna');
+      await sshManager.executeCommand(
+        this.connectionId,
+        'sudo systemctl restart luna',
+      );
 
       this.sendProgress({
         percentage: 100,
@@ -128,6 +142,7 @@ class AppSwitcher {
   > {
     try {
       const result = await sshManager.executeCommand(
+        this.connectionId,
         'cat /srv/yogoos/config.json',
       );
       const config = JSON.parse(result);

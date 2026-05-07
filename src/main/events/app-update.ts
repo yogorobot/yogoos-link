@@ -25,9 +25,15 @@ class AppUpdater {
   // private options: IAppUpdateOptions;
   private window: BrowserWindow;
 
-  constructor(windowId: number) {
+  private connectionId: string;
+
+  constructor(windowId: number, connectionId?: string) {
     // this.options = options;
     this.window = BrowserWindow.fromId(windowId) as BrowserWindow;
+    if (!connectionId) {
+      throw new Error('应用更新窗口没有绑定连接');
+    }
+    this.connectionId = connectionId;
     this.window.once('closed', () => {
       // 清理引用
       this.window = null;
@@ -38,7 +44,7 @@ class AppUpdater {
   // eslint-disable-next-line class-methods-use-this
   private async runCommand(command: string): Promise<string> {
     try {
-      return await sshManager.executeCommand(command);
+      return await sshManager.executeCommand(this.connectionId, command);
     } catch (error) {
       log.error('远程命令执行失败:', command, error);
       throw error;
@@ -92,10 +98,7 @@ class AppUpdater {
 
     const attemptUpload = (): Promise<string> => {
       return new Promise((resolve, reject) => {
-        if (!sshManager.sshConnection) {
-          reject(new Error('SSH连接未建立'));
-          return;
-        }
+        const sshConnection = sshManager.getConnection(this.connectionId);
 
         // 设置上传超时
         const uploadTimeout = 30 * 60 * 1000; // 30分钟超时
@@ -121,7 +124,7 @@ class AppUpdater {
         timeoutId = setTimeout(handleTimeout, uploadTimeout);
 
         // 使用ssh2的SFTP功能
-        sshManager.sshConnection.sftp((err, sftp) => {
+        sshConnection.sftp((err, sftp) => {
           if (err) {
             cleanup();
             reject(new Error(`SFTP连接失败: ${err.message}`));
@@ -214,6 +217,7 @@ class AppUpdater {
     // 重试逻辑
     while (retryCount < maxRetries) {
       try {
+        // eslint-disable-next-line no-await-in-loop
         return await attemptUpload();
       } catch (error) {
         retryCount += 1;
@@ -232,7 +236,10 @@ class AppUpdater {
           percentage: 20,
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // 等待2秒后重试
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => {
+          setTimeout(resolve, 2000);
+        }); // 等待2秒后重试
       }
     }
 

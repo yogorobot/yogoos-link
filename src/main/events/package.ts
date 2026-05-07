@@ -6,10 +6,16 @@ import { ErrorResponse, SuccessResponse } from '../util';
 // 查询包裹
 
 class Package {
-  window: Electron.BrowserWindow | null = null;
+  window: BrowserWindow | null = null;
 
-  constructor(windowId: number) {
+  private connectionId: string;
+
+  constructor(windowId: number, connectionId?: string) {
     this.window = BrowserWindow.fromId(windowId);
+    if (!connectionId) {
+      throw new Error('包裹窗口没有绑定连接');
+    }
+    this.connectionId = connectionId;
     this.window?.on('closed', () => {
       // 清理引用
       this.window = null;
@@ -18,7 +24,10 @@ class Package {
 
   // eslint-disable-next-line class-methods-use-this
   private async getClient() {
-    const host = await sshManager.executeCommand('sudo hostname');
+    const host = await sshManager.executeCommand(
+      this.connectionId,
+      'sudo hostname',
+    );
     return axios.create({
       baseURL: `http://${host}.yogo.love:45948`,
       timeout: 30000,

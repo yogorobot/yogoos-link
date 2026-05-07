@@ -1,7 +1,6 @@
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import RemoteDebug from './pages/RemoteDebug';
-import Login from './pages/Login';
-import Home from './pages/Home';
+import SshConnections from './pages/SshConnections';
 import HistoryLog from './pages/HistoryLog';
 import RealTimeLog from './pages/RealTimeLog';
 import AppUpdate from './pages/AppUpdate';
@@ -21,8 +20,8 @@ function AppContent() {
 
       <div className="flex-1 overflow-hidden">
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/home" element={<Home />} />
+          <Route path="/" element={<SshConnections />} />
+          <Route path="/connections" element={<SshConnections />} />
           <Route path="/app-update" element={<AppUpdate />} />
           <Route path="/app-switch" element={<AppSwitch />} />
           <Route path="/remote-debug" element={<RemoteDebug />} />

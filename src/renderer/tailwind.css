@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /*
  * @NOTE: Prepend a `~` to css file paths that are in your node_modules
@@ -14,7 +14,12 @@ body {
   -webkit-tap-highlight-color: transparent;
   outline: none;
   overflow: hidden; /* 防止窗口出现滚动条 */
-  background: #1e293b; /* 使用solid背景色而不是透明 */
+  background: #020617; /* 使用solid背景色而不是透明 */
+  --yogo-titlebar-safe-height: 0px;
+}
+
+body.platform-darwin {
+  --yogo-titlebar-safe-height: 2.4rem;
 }
 
 #root {
@@ -68,5 +73,146 @@ body {
   &::-webkit-scrollbar {
     width: 12px;
     height: 12px;
+  }
+}
+
+/* 统一暗色视觉基线，供各窗口复用 */
+.yogo-page {
+  min-height: 100%;
+  width: 100%;
+  overflow: auto;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(37, 99, 235, 0.2),
+      transparent 30rem
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(14, 165, 233, 0.14),
+      transparent 28rem
+    ),
+    #020617;
+  color: #e5e7eb;
+}
+
+.yogo-page-shell {
+  width: min(100%, 72rem);
+  margin: 0 auto;
+  padding: 1rem 2rem 2rem;
+}
+
+.yogo-titlebar-safe-area {
+  height: var(--yogo-titlebar-safe-height);
+  flex: 0 0 auto;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.36);
+}
+
+.yogo-titlebar-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 5.25rem;
+  overflow: hidden;
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yogo-modal-overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--yogo-titlebar-safe-height);
+  bottom: 0;
+}
+
+.yogo-panel {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.78);
+  box-shadow: 0 24px 80px rgba(2, 6, 23, 0.42);
+  backdrop-filter: blur(18px);
+}
+
+.yogo-card {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.72);
+  color: #e5e7eb;
+  box-shadow: 0 18px 48px rgba(2, 6, 23, 0.28);
+}
+
+.yogo-card-hover {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.yogo-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 22px 60px rgba(2, 6, 23, 0.42);
+}
+
+.yogo-input {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(2, 6, 23, 0.55);
+  color: #f8fafc;
+  outline: none;
+}
+
+.yogo-input::placeholder {
+  color: rgba(203, 213, 225, 0.48);
+}
+
+.yogo-input:focus {
+  border-color: rgba(96, 165, 250, 0.75);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.16);
+}
+
+.yogo-button-primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.yogo-button-primary:hover {
+  background: #1d4ed8;
+}
+
+.yogo-button-secondary {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.72);
+  color: #cbd5e1;
+}
+
+.yogo-button-secondary:hover {
+  background: rgba(30, 41, 59, 0.9);
+  color: #f8fafc;
+}
+
+.yogo-button-danger {
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.22);
+  color: #fca5a5;
+}
+
+.yogo-button-danger:hover {
+  background: rgba(185, 28, 28, 0.32);
+  color: #fecaca;
+}
+
+@media (max-width: 640px) {
+  .yogo-page-shell {
+    padding: 0.75rem 1rem 1rem;
   }
 }

@@ -1,216 +1,86 @@
-// import * as fs from 'fs';
 import {
   app,
   BrowserWindow,
   BrowserWindowConstructorOptions,
   shell,
   screen,
-  Tray,
-  Menu,
-  nativeImage,
 } from 'electron';
 import { merge } from 'lodash';
 import path from 'path';
 import log from 'electron-log';
-import { resolveHtmlPath, getAssetPath } from '../util';
+import { resolveHtmlPath } from '../util';
 import MenuBuilder from '../menu';
-import { sshManager } from '.';
-// import System from '../events/system';
+import sshManager from './ssh';
 
 class WindowManager {
-  public loginWindow: BrowserWindow = null;
+  public connectionsWindow: BrowserWindow = null;
 
-  public mainWindow: BrowserWindow = null;
+  private childWindows: Map<string, BrowserWindow> = new Map();
 
-  public childWindows: Map<string, BrowserWindow> = new Map();
+  private windowConnections: Map<number, string> = new Map();
 
-  private tray: Tray | null = null;
-
-  private isQuitting = false;
-
-  constructor() {}
-
-  async createLoginWindow(
+  async createConnectionsWindow(
     opt?: BrowserWindowConstructorOptions,
   ): Promise<BrowserWindow> {
-    await this.closeAllWindows();
-    const isExistsWindow = this.getLoginWindow();
+    const isExistsWindow = this.getConnectionsWindow();
     if (isExistsWindow) {
       isExistsWindow.focus();
       return isExistsWindow;
     }
-    this.loginWindow = await this.createWindow('login', {
-      resizable: false,
-      width: 400,
-      height: 620,
+    this.connectionsWindow = await this.createWindow('connections', {
+      width: 980,
+      height: 680,
       titleBarStyle: 'hiddenInset',
       ...opt,
     });
 
-    return this.loginWindow;
-  }
-
-  async createMainWindow(
-    opt?: BrowserWindowConstructorOptions,
-  ): Promise<BrowserWindow> {
-    const isExistsWindow = this.getMainWindow();
-    if (isExistsWindow) {
-      isExistsWindow.focus();
-      return isExistsWindow;
-    }
-    this.mainWindow = await this.createWindow('home', {
-      resizable: false,
-      ...opt,
-    });
-
-    this.mainWindow.on('close', (event) => {
-      if (this.isQuitting) {
-        return; // Allow the window to be destroyed
-      }
-      event.preventDefault();
-      this.createTray(); // 在这里创建托盘图标
-      this.hideMainWindow();
-    });
-
-    this.mainWindow.on('closed', () => {
-      this.destroyTray();
-    });
-
-    const loginWindow = this.getLoginWindow();
-    if (loginWindow) {
-      loginWindow.destroy();
-    }
-
-    return this.mainWindow;
-  }
-
-  private destroyTray() {
-    if (this.tray) {
-      this.tray.destroy();
-      this.tray = null;
-    }
-  }
-
-  createTray() {
-    if (this.tray) return;
-    const iconPath = getAssetPath('tray.png');
-    const image = nativeImage.createFromPath(iconPath);
-
-    try {
-      if (process.platform === 'darwin') {
-        // image.setTemplateImage(true);
-        this.tray = new Tray(image);
-      } else {
-        const resizedIcon = image.resize({ width: 16, height: 16 });
-        this.tray = new Tray(resizedIcon);
-      }
-    } catch (error) {
-      log.error(
-        '[Tray Debug] An unexpected error occurred during tray creation:',
-        error,
-      );
-      return;
-    }
-
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: '显示/隐藏应用',
-        click: () => this.toggleWindowVisibility(),
-      },
-
-      { type: 'separator' },
-      {
-        label: '断开连接',
-        click: () => {
-          sshManager.removeConnection();
-        },
-      },
-      { type: 'separator' },
-      {
-        label: '退出应用',
-        click: () => {
-          this.isQuitting = true;
-          app.quit();
-        },
-      },
-    ]);
-
-    this.tray.setContextMenu(contextMenu);
-    this.tray.setToolTip('YOLINK');
-
-    this.tray.on('click', () => {
-      // 单击托盘图标时判断
-      // 如果主窗口已经显示，但没有获取焦点，则获取焦点
-      if (process.platform === 'darwin') {
-        if (!this.mainWindow?.isFocused()) {
-          this.focusMainWindow();
-        }
-      } else {
-        this.toggleWindowVisibility();
-      }
-    });
-  }
-
-  hideMainWindow() {
-    this.mainWindow?.hide();
-  }
-
-  showMainWindow() {
-    this.mainWindow?.show();
-    this.destroyTray();
-  }
-
-  focusMainWindow() {
-    this.mainWindow?.focus();
-  }
-
-  toggleWindowVisibility() {
-    if (this.mainWindow?.isVisible()) {
-      this.hideMainWindow();
-    } else {
-      this.showMainWindow();
-    }
-  }
-
-  setQuitting(flag: boolean) {
-    this.isQuitting = flag;
+    return this.connectionsWindow;
   }
 
   async createChildWindow(
     route: string,
     opt?: BrowserWindowConstructorOptions,
+    connectionId?: string,
   ): Promise<BrowserWindow> {
-    const isExistsWindow = this.getChildWindowById(route);
+    const windowId = connectionId ? `${connectionId}:${route}` : route;
+    const isExistsWindow = this.getChildWindowById(windowId);
     if (isExistsWindow) {
       isExistsWindow.focus();
       return isExistsWindow;
     }
-    const window = await this.createWindow(route, {
-      resizable: false,
-      ...opt,
-    });
-    this.childWindows.set(route, window);
+    const window = await this.createWindow(
+      route,
+      {
+        ...opt,
+      },
+      connectionId,
+    );
+    this.childWindows.set(windowId, window);
     window.once('close', () => {
-      this.childWindows.delete(route);
-      log.info(`子窗口已关闭: ${route}`);
+      this.childWindows.delete(windowId);
+      this.windowConnections.delete(window.id);
+      log.info(`子窗口已关闭: ${windowId}`);
     });
 
     return window;
   }
 
-  getDisplay() {
+  private static getDisplay() {
     const mousePosition = screen.getCursorScreenPoint();
     return (
       screen.getDisplayNearestPoint(mousePosition) || screen.getPrimaryDisplay()
     );
   }
 
-  getTitle() {
-    if (sshManager?.sshCredentials?.host) {
-      if (sshManager?.sshCredentials?.useJumpHost) {
-        return `${sshManager?.sshCredentials?.jumpHost} -> ${sshManager?.sshCredentials?.host}`;
+  private static getTitle(connectionId?: string) {
+    if (connectionId) {
+      const credentials = sshManager.getPublicCredentials(connectionId);
+      if (credentials?.host) {
+        if (credentials.useJumpHost) {
+          return `${credentials.jumpHost} -> ${credentials.host}`;
+        }
+        return credentials.host;
       }
-      return `${sshManager?.sshCredentials?.host}`;
     }
 
     return 'YOLINK';
@@ -219,41 +89,46 @@ class WindowManager {
   private async createWindow(
     filePath: string,
     options?: BrowserWindowConstructorOptions,
+    connectionId?: string,
   ): Promise<BrowserWindow> {
-    const display = this.getDisplay();
-    const defaultSize = {
-      width: Math.min(1200, display.bounds.width),
-      height: Math.min(720, display.bounds.height),
-    };
-    const width = options?.width || defaultSize.width;
-    const height = options?.height || defaultSize.height;
-    const x = display.bounds.x + Math.floor((display.bounds.width - width) / 2);
-    const y =
-      display.bounds.y + Math.floor((display.bounds.height - height) / 2);
+    const display = WindowManager.getDisplay();
+    const { workArea } = display;
+    const minWidth = Math.min(options?.minWidth || 420, workArea.width);
+    const minHeight = Math.min(options?.minHeight || 420, workArea.height);
+    const requestedWidth = options?.width || 1200;
+    const requestedHeight = options?.height || 720;
+    const width = Math.max(minWidth, Math.min(requestedWidth, workArea.width));
+    const height = Math.max(
+      minHeight,
+      Math.min(requestedHeight, workArea.height),
+    );
+    const x = workArea.x + Math.floor((workArea.width - width) / 2);
+    const y = workArea.y + Math.floor((workArea.height - height) / 2);
 
     const platformOptions: BrowserWindowConstructorOptions =
-      process.platform === 'darwin' ? {} : { autoHideMenuBar: true };
+      process.platform === 'darwin'
+        ? { titleBarStyle: 'hiddenInset' }
+        : { autoHideMenuBar: true };
 
-    // 如果设置了 resizable: false，自动设置 maximizable 和 fullscreenable 为 false
-    const finalOptions = { ...options };
-    if (finalOptions.resizable === false) {
-      if (finalOptions.maximizable === undefined) {
-        finalOptions.maximizable = false;
-      }
-      if (finalOptions.fullscreenable === undefined) {
-        finalOptions.fullscreenable = false;
-      }
-    }
+    const finalOptions = {
+      ...options,
+      width,
+      height,
+      minWidth,
+      minHeight,
+      x,
+      y,
+    };
 
     const win = new BrowserWindow(
       merge(
         {
-          width,
-          height,
-          x,
-          y,
-          backgroundColor: '#1e293b',
-          title: this.getTitle(),
+          resizable: true,
+          minimizable: true,
+          maximizable: true,
+          fullscreenable: true,
+          backgroundColor: '#020617',
+          title: WindowManager.getTitle(connectionId),
           webPreferences: {
             preload: app.isPackaged
               ? path.join(__dirname, 'preload.js')
@@ -266,33 +141,62 @@ class WindowManager {
     );
 
     win.loadURL(decodeURIComponent(resolveHtmlPath(filePath)));
+    if (connectionId) {
+      this.windowConnections.set(win.id, connectionId);
+    }
     new MenuBuilder(win).buildMenu();
     win.webContents.setWindowOpenHandler((data) => {
       shell.openExternal(data.url);
       return { action: 'deny' };
     });
 
+    if (filePath === 'remote-debug') {
+      win.webContents.on('console-message', (_event, level, message, line) => {
+        log.info('[RemoteDebug:window-console]', { level, message, line });
+      });
+      win.webContents.on('did-attach-webview', (_event, webContents) => {
+        log.info('[RemoteDebug:webview-attached]', {
+          id: webContents.id,
+          url: webContents.getURL(),
+        });
+        webContents.on(
+          'console-message',
+          (_consoleEvent, level, message, line) => {
+            log.info('[RemoteDebug:webview-console]', { level, message, line });
+          },
+        );
+        webContents.on(
+          'did-fail-load',
+          (
+            _loadEvent,
+            errorCode,
+            errorDescription,
+            validatedURL,
+            isMainFrame,
+          ) => {
+            log.info('[RemoteDebug:webview-fail-load]', {
+              errorCode,
+              errorDescription,
+              validatedURL,
+              isMainFrame,
+            });
+          },
+        );
+      });
+    }
+
     return win;
   }
 
-  getLoginWindow(): BrowserWindow | null {
-    if (this.loginWindow && this.loginWindow.isDestroyed()) {
-      this.loginWindow = null;
+  getConnectionsWindow(): BrowserWindow | null {
+    if (this.connectionsWindow && this.connectionsWindow.isDestroyed()) {
+      this.connectionsWindow = null;
     }
-    return this.loginWindow;
+    return this.connectionsWindow;
   }
 
-  getMainWindow(): BrowserWindow | null {
-    if (this.mainWindow && this.mainWindow.isDestroyed()) {
-      this.mainWindow = null;
-    }
-    return this.mainWindow;
-  }
-
-  getChildWindows(): BrowserWindow[] {
-    return Array.from(this.childWindows.values()).filter(
-      (win) => win && !win.isDestroyed(),
-    );
+  getConnectionId(windowId: number): string | undefined {
+    return this.windowConnections.get(windowId);
   }
 
   getChildWindowById(filePath: string): BrowserWindow | null {
@@ -304,42 +208,26 @@ class WindowManager {
     return window;
   }
 
-  getAllWindows(): BrowserWindow[] {
-    return [
-      this.getLoginWindow(),
-      this.getMainWindow(),
-      ...this.getChildWindows(),
-    ].filter(Boolean);
-  }
+  closeChildWindows(connectionId?: string) {
+    const windows = connectionId
+      ? Array.from(this.childWindows.entries()).filter(([windowId]) =>
+          windowId.startsWith(`${connectionId}:`),
+        )
+      : Array.from(this.childWindows.entries());
 
-  closeAllWindows() {
-    const windows = this.getAllWindows();
-    windows.forEach((win) => {
+    windows.forEach(([windowId, win]) => {
       try {
         if (win) {
           win.destroy();
         }
-      } catch (error) {
-        log.warn(`关闭窗口失败:`, error);
-      }
-    });
-    this.mainWindow = null;
-    this.loginWindow = null;
-    this.childWindows.clear();
-  }
-
-  closeChildWindows() {
-    const windows = this.getChildWindows();
-    windows.forEach((win) => {
-      try {
-        if (win) {
-          win.destroy();
-        }
+        this.childWindows.delete(windowId);
       } catch (error) {
         log.warn(`关闭子窗口失败:`, error);
       }
     });
-    this.childWindows.clear();
+    if (!connectionId) {
+      this.childWindows.clear();
+    }
   }
 }
 

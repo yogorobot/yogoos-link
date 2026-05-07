@@ -7,8 +7,15 @@ export const useDebug = () => {
     return window.electron.ipcRenderer.invoke('debug:disconnect', formValues);
   };
 
+  const getDebugTargets = () => {
+    return window.electron.ipcRenderer.invoke('debug:get-targets');
+  };
+
   return {
     debugConnect,
     debugDisconnect,
+    getDebugTargets,
   };
 };
+
+export default useDebug;

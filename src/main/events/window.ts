@@ -5,8 +5,11 @@ import { sshManager, windowManager } from '../managers';
 class Window {
   window: BrowserWindow | null = null;
 
-  constructor(winId) {
+  private connectionId?: string;
+
+  constructor(winId, connectionId?: string) {
     this.window = BrowserWindow.fromId(winId);
+    this.connectionId = connectionId;
     this.window?.once('closed', () => {
       // 清理引用
       this.window = null;
@@ -26,18 +29,34 @@ class Window {
       isMaximized: window.isMaximized(),
       isMinimized: window.isMinimized(),
       isFocused: window.isFocused(),
-      authInfo: sshManager.getPublicCredentials(),
+      authInfo: this.connectionId
+        ? sshManager.getPublicCredentials(this.connectionId)
+        : null,
     };
     return new SuccessResponse(info);
   }
 
   // eslint-disable-next-line class-methods-use-this
-  createChildWindow(filePath, options) {
-    const window = windowManager.createChildWindow(filePath, options);
+  createChildWindow(filePath, options, connectionId?: string) {
+    const window = windowManager.createChildWindow(
+      filePath,
+      options,
+      connectionId,
+    );
     if (window) {
       return new SuccessResponse(null);
     }
     return new ErrorResponse('创建窗口失败');
+  }
+
+  closeWindow() {
+    const { window } = this;
+    if (!window) {
+      return new SuccessResponse(null);
+    }
+
+    window.close();
+    return new SuccessResponse(null);
   }
 }
 

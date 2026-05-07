@@ -8,8 +8,7 @@ const cleanupAndExit = () => {
   log.info('应用退出清理开始...');
 
   try {
-    // 退出应用时只清理资源，不再重新拉起登录窗口。
-    sshManager.removeConnection({ reopenLoginWindow: false });
+    sshManager.removeAllConnections();
 
     log.info('资源清理完成');
   } catch (error) {
@@ -37,27 +36,22 @@ app.on('window-all-closed', () => {
 // 应用退出前清理资源
 app.on('before-quit', () => {
   log.info('应用退出前清理资源...');
-  windowManager.setQuitting(true);
   cleanupAndExit();
 });
 
 app
   .whenReady()
   .then(() => {
-    new IPCEventsV2();
-    windowManager.createLoginWindow();
+    const ipcEvents = new IPCEventsV2();
+    windowManager.createConnectionsWindow();
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
-      const mainWindow = windowManager.getMainWindow();
-      if (mainWindow) {
-        // If the main window exists (even if hidden), show it.
-        windowManager.showMainWindow();
-      } else if (BrowserWindow.getAllWindows().length === 0) {
-        // If no windows exist at all, create a new login window.
-        windowManager.createLoginWindow();
+      if (BrowserWindow.getAllWindows().length === 0) {
+        windowManager.createConnectionsWindow();
       }
       return null;
     });
+    return ipcEvents;
   })
-  .catch(console.log);
+  .catch((error) => log.error(error));

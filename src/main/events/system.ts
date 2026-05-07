@@ -7,8 +7,14 @@ import { ErrorResponse, SuccessResponse } from '../util';
 class System {
   window: BrowserWindow | null = null;
 
-  constructor(windowId: number) {
+  private connectionId: string;
+
+  constructor(windowId: number, connectionId?: string) {
     this.window = BrowserWindow.fromId(windowId);
+    if (!connectionId) {
+      throw new Error('系统窗口没有绑定连接');
+    }
+    this.connectionId = connectionId;
     this.window?.once('closed', () => {
       // 清理引用
       this.window = null;
@@ -17,7 +23,10 @@ class System {
 
   // eslint-disable-next-line class-methods-use-this
   private async getClient() {
-    const host = await sshManager.executeCommand('sudo hostname');
+    const host = await sshManager.executeCommand(
+      this.connectionId,
+      'sudo hostname',
+    );
     return axios.create({
       baseURL: `http://${host}.yogo.love:45948`,
       timeout: 30000,
@@ -30,6 +39,7 @@ class System {
     try {
       // 使用 bash -c 包装，确保命令总是返回 0
       const stdout = await sshManager.executeCommand(
+        this.connectionId,
         `bash -c "df -h -x tmpfs -x devtmpfs --output=source,size,used,avail,pcent,target 2>/dev/null; exit 0"`,
       );
       return new SuccessResponse(stdout);
@@ -42,7 +52,7 @@ class System {
   // eslint-disable-next-line class-methods-use-this
   async reboot() {
     try {
-      await sshManager.executeCommand('sudo reboot');
+      await sshManager.executeCommand(this.connectionId, 'sudo reboot');
       return new SuccessResponse(null);
     } catch (error) {
       console.error('执行重启命令失败:', error);
@@ -59,7 +69,7 @@ class System {
       type: 'warning',
       title: '系统重启确认',
       message: '您确定要重启系统吗？',
-      detail: '系统重启后，所有未保存的工作将丢失，SSH连接也会断开。',
+      detail: '系统重启后，所有未保存的工作将丢失，当前连接也会断开。',
       buttons: ['取消', '确认重启'],
       defaultId: 0,
       cancelId: 0,
@@ -109,7 +119,10 @@ class System {
       log.info('查找 TF 卡挂载点');
 
       const mountPointCommand = `df -h 2>/dev/null | grep '/dev/mmcblk' | awk '{print $NF}' | head -n 1 || echo ""`;
-      const mountPoint = await sshManager.executeCommand(mountPointCommand);
+      const mountPoint = await sshManager.executeCommand(
+        this.connectionId,
+        mountPointCommand,
+      );
 
       if (!mountPoint.trim()) {
         log.warn('未检测到 TF 卡挂载点');
@@ -141,7 +154,10 @@ class System {
 
       // 2. 检查 lsof 命令是否可用
       const lsofCheckCommand = `command -v lsof > /dev/null 2>&1 && echo "available" || echo "not_available"`;
-      const lsofAvailable = await sshManager.executeCommand(lsofCheckCommand);
+      const lsofAvailable = await sshManager.executeCommand(
+        this.connectionId,
+        lsofCheckCommand,
+      );
 
       if (lsofAvailable.trim() !== 'available') {
         log.warn('lsof 命令不可用');
@@ -150,7 +166,10 @@ class System {
 
       // 3. 查找使用 TF 卡的进程 PID
       const lsofCommand = `sudo lsof +D "${mountPoint}" 2>/dev/null | tail -n +2 | awk '{print $2}' | sort -u || echo ""`;
-      const pidsOutput = await sshManager.executeCommand(lsofCommand);
+      const pidsOutput = await sshManager.executeCommand(
+        this.connectionId,
+        lsofCommand,
+      );
 
       if (!pidsOutput.trim()) {
         log.info('未发现使用 TF 卡的进程');
@@ -168,7 +187,10 @@ class System {
         pids.map(async (pid) => {
           try {
             const serviceCommand = `systemctl status ${pid} 2>/dev/null | grep -oP '●\\s+\\K[^\\s]+\\.service' | head -n 1 || echo ""`;
-            const serviceName = await sshManager.executeCommand(serviceCommand);
+            const serviceName = await sshManager.executeCommand(
+              this.connectionId,
+              serviceCommand,
+            );
 
             if (serviceName.trim() && !services.includes(serviceName.trim())) {
               services.push(serviceName.trim());
@@ -242,7 +264,10 @@ class System {
 
       // 获取 TF 卡设备路径
       const deviceCommand = `df | grep '${mountPoint}' | awk '{print $1}' | head -n 1`;
-      const device = await sshManager.executeCommand(deviceCommand);
+      const device = await sshManager.executeCommand(
+        this.connectionId,
+        deviceCommand,
+      );
 
       if (!device.trim()) {
         const errorMsg = '无法获取 TF 卡设备路径';
@@ -366,6 +391,7 @@ fi
 echo "格式化操作成功完成"
 `;
       const exitCode = await sshManager.executeCommandWithStream(
+        this.connectionId,
         formatScript,
         (data: string) => {
           this.window?.webContents.send('system:clear-cache-progress', data);

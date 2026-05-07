@@ -33,11 +33,18 @@ type LogChannels =
   | 'log:clear-stream';
 
 // 其余代码保持不变
-type SSHChannels = 'ssh:authenticate' | 'ssh:disconnect';
+type SSHChannels =
+  | 'ssh:authenticate'
+  | 'ssh:disconnect-by-id'
+  | 'ssh:connection-closed';
 
 type FileChannels = 'file:show-open-dialog';
 
-type DebugChannels = 'debug:connect' | 'debug:disconnect';
+type DebugChannels =
+  | 'debug:connect'
+  | 'debug:disconnect'
+  | 'debug:get-targets'
+  | 'debug:log';
 
 type AppChannels =
   | 'app:update'
@@ -112,3 +119,13 @@ window.addEventListener('contextmenu', (ev) => {
   // 阻止默认行为
   ev.preventDefault();
 });
+
+const markPlatform = () => {
+  document.body.classList.add(`platform-${process.platform}`);
+};
+
+if (document.body) {
+  markPlatform();
+} else {
+  window.addEventListener('DOMContentLoaded', markPlatform, { once: true });
+}

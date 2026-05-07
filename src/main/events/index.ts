@@ -1,12 +1,10 @@
 import { BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
-import { error } from 'electron-log';
 import Debug from './debug';
 import Window from './window';
 import Logs from './logs';
 import System from './system';
-import ssh, { SSHCredentials } from '../managers/ssh';
+import { SSHCredentials } from '../managers/ssh';
 import { sshManager, windowManager } from '../managers';
-import { decodeBase64, ErrorResponse, SuccessResponse } from '../util';
 import AppUpdater, { IAppUpdateOptions } from './app-update';
 import AppSwitcher, { IAppSwitcherOptions } from './switch-app';
 import Package from './package';
@@ -20,7 +18,7 @@ import NotificationManager from './notification';
 function getOrCreateInstance<T>(
   instancesMap: Map<number, T>,
   event: IpcMainInvokeEvent,
-  instanceClass: new (...args: any[]) => T,
+  InstanceClass: new (windowId: number, connectionId?: string) => T,
 ): T {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) {
@@ -32,12 +30,15 @@ function getOrCreateInstance<T>(
     return instancesMap.get(windowId)!;
   }
 
-  const newInstance = new instanceClass(windowId);
+  const newInstance = new InstanceClass(
+    windowId,
+    windowManager.getConnectionId(windowId),
+  );
   instancesMap.set(windowId, newInstance);
 
   window.once('closed', () => {
     console.log(
-      `窗口 ${windowId} 已关闭，正在清理 ${instanceClass.name} 实例...`,
+      `窗口 ${windowId} 已关闭，正在清理 ${InstanceClass.name} 实例...`,
     );
     instancesMap.delete(windowId);
   });
@@ -80,7 +81,7 @@ class IPCEventsV2 {
     this.resetInstances();
 
     this.registerLogEvents();
-    this.registerSSHEvents();
+    IPCEventsV2.registerSSHEvents();
     this.registerWindowEvents();
     this.registerDebugEvents();
     this.registerFileEvents();
@@ -88,6 +89,7 @@ class IPCEventsV2 {
     this.registerNotificationEvents();
     this.registerSystemEvents();
     this.registerPackageEvents();
+    IPCEventsV2.registerSSHConnectionLifecycle();
   }
 
   resetInstances() {
@@ -127,8 +129,15 @@ class IPCEventsV2 {
   }
 
   registerSystemEvents() {
-    ipcMain.handle('system:reboot', async (event) => {
-      return await getOrCreateInstance(
+    ipcMain.handle('system:reboot', async (event, connectionId?: string) => {
+      if (connectionId) {
+        const window = BrowserWindow.fromWebContents(event.sender);
+        if (!window) {
+          throw new Error('无法解析当前窗口');
+        }
+        return new System(window.id, connectionId).rebootWithConfirmation();
+      }
+      return getOrCreateInstance(
         this.systemInstances,
         event,
         System,
@@ -136,7 +145,7 @@ class IPCEventsV2 {
     });
 
     ipcMain.handle('system:getStorageInfo', async (event) => {
-      return await getOrCreateInstance(
+      return getOrCreateInstance(
         this.systemInstances,
         event,
         System,
@@ -144,7 +153,7 @@ class IPCEventsV2 {
     });
 
     ipcMain.handle('system:getServicesUsingTFCard', async (event) => {
-      return await getOrCreateInstance(
+      return getOrCreateInstance(
         this.systemInstances,
         event,
         System,
@@ -192,22 +201,27 @@ class IPCEventsV2 {
     });
   }
 
-  registerSSHEvents() {
+  static registerSSHEvents() {
     ipcMain.handle(
       'ssh:authenticate',
       async (event, credentials: SSHCredentials) => {
-        const result = await sshManager.authenticateSSH(credentials);
-        if (result.success) {
-          windowManager.createMainWindow();
-        }
-        return result;
+        return sshManager.authenticateSSH(credentials);
       },
     );
 
-    ipcMain.handle('ssh:disconnect', (event) => {
-      sshManager.removeConnection();
-      // const win = BrowserWindow.fromId(event.sender.id);
-      // win.close();
+    ipcMain.handle('ssh:disconnect-by-id', (event, connectionId: string) => {
+      windowManager.closeChildWindows(connectionId);
+      sshManager.removeConnection(connectionId);
+      return { success: true, data: null };
+    });
+  }
+
+  static registerSSHConnectionLifecycle() {
+    sshManager.onConnectionClosed((event) => {
+      windowManager.closeChildWindows(event.connectionId);
+      windowManager
+        .getConnectionsWindow()
+        ?.webContents.send('ssh:connection-closed', event);
     });
   }
 
@@ -220,12 +234,29 @@ class IPCEventsV2 {
       ).getCurrentInfo();
     });
 
-    ipcMain.handle('window:create', async (event, filePath, options) => {
+    ipcMain.handle(
+      'window:create',
+      async (event, filePath, options, connectionId?: string) => {
+        const window = BrowserWindow.fromWebContents(event.sender);
+        return getOrCreateInstance(
+          this.windowInstances,
+          event,
+          Window,
+        ).createChildWindow(
+          filePath,
+          options,
+          connectionId ||
+            (window ? windowManager.getConnectionId(window.id) : undefined),
+        );
+      },
+    );
+
+    ipcMain.handle('window:close', (event) => {
       return getOrCreateInstance(
         this.windowInstances,
         event,
         Window,
-      ).createChildWindow(filePath, options);
+      ).closeWindow();
     });
   }
 
@@ -241,6 +272,14 @@ class IPCEventsV2 {
   }
 
   registerDebugEvents() {
+    ipcMain.on('debug:log', (event, payload) => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      console.info('[RemoteDebug:renderer]', {
+        windowId: window?.id,
+        ...payload,
+      });
+    });
+
     ipcMain.handle('debug:connect', (event, formValues) => {
       const debugInstance = getOrCreateInstance(
         this.debugInstances,
@@ -253,6 +292,11 @@ class IPCEventsV2 {
     ipcMain.handle('debug:disconnect', (event) => {
       const debugInstance = getInstance(this.debugInstances, event);
       return debugInstance?.cleanup();
+    });
+
+    ipcMain.handle('debug:get-targets', (event) => {
+      const debugInstance = getInstance(this.debugInstances, event);
+      return debugInstance?.getTargets();
     });
   }
 
@@ -277,16 +321,13 @@ class IPCEventsV2 {
       },
     );
 
-    ipcMain.handle(
-      'app:get-current-app',
-      async (event, options: IAppSwitcherOptions) => {
-        return getOrCreateInstance(
-          this.appSwitcherInstances,
-          event,
-          AppSwitcher,
-        ).getCurrentApp();
-      },
-    );
+    ipcMain.handle('app:get-current-app', async (event) => {
+      return getOrCreateInstance(
+        this.appSwitcherInstances,
+        event,
+        AppSwitcher,
+      ).getCurrentApp();
+    });
   }
 
   registerNotificationEvents() {

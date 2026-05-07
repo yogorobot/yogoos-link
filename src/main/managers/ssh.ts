@@ -3,10 +3,9 @@ import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { Client } from 'ssh2';
 import type { Client as SSH2Client, ClientChannel } from 'ssh2';
 import { SuccessResponse, ErrorResponse, Response } from '../util';
-
-const { Client } = require('ssh2') as typeof import('ssh2');
 
 export interface SSHCredentials {
   host: string;
@@ -41,46 +40,82 @@ export interface TunnelResult {
   tunnelId?: string;
 }
 
+interface SSHConnectionContext {
+  id: string;
+  connection: SSH2Client;
+  credentials: SSHCredentials;
+  activeTunnels: Map<string, net.Server>;
+  tunnelPorts: Map<string, number>;
+  tunnelConnections: Map<string, Set<net.Socket>>;
+  tunnelCounter: number;
+  isDisconnecting: boolean;
+}
+
+export interface SSHConnectionClosedEvent {
+  connectionId: string;
+  host: string;
+  port: string;
+  username: string;
+  reason: string;
+}
+
+type SSHConnectionClosedListener = (event: SSHConnectionClosedEvent) => void;
+
+const SSH_CONNECT_TIMEOUT = 10000;
+const SSH_KEEPALIVE_INTERVAL = 3000;
+const SSH_KEEPALIVE_COUNT_MAX = 10;
+
 export class SSHAuthManager {
-  public sshConnection: SSH2Client = null;
+  private connections: Map<string, SSHConnectionContext> = new Map();
 
-  public sshCredentials: SSHCredentials = null;
+  private connectionClosedListeners = new Set<SSHConnectionClosedListener>();
 
-  private isDisconnecting = false;
-
-  private activeTunnels: Map<string, net.Server> = new Map();
-
-  private tunnelCounter = 0;
-
-  private tunnelStats: Map<
-    string,
-    { connectionCount: number; createdAt: Date }
-  > = new Map();
-
-  private tunnelConnections: Map<string, Set<net.Socket>> = new Map();
+  private static attachPasswordAuthHandler(
+    connection: SSH2Client,
+    password: string,
+  ): void {
+    connection.on(
+      'keyboard-interactive',
+      (_name, _instructions, _lang, prompts, finish) => {
+        finish(prompts.map(() => password));
+      },
+    );
+  }
 
   public async authenticateSSH(
     credentials: SSHCredentials,
-  ): Promise<Response<null>> {
-    this.isDisconnecting = false; // Reset flag on new connection attempt
+    connectionId?: string,
+  ): Promise<Response<{ connectionId: string }>> {
+    const id = connectionId || SSHAuthManager.createConnectionId(credentials);
+    if (this.connections.has(id)) {
+      this.removeConnection(id);
+    }
+
     return new Promise((resolve) => {
       if (credentials.useJumpHost) {
-        this.connectThroughJumpHost(credentials, resolve);
+        this.connectThroughJumpHost(id, credentials, resolve);
       } else {
-        this.connectDirectly(credentials, resolve);
+        this.connectDirectly(id, credentials, resolve);
       }
     });
   }
 
+  private static createConnectionId(credentials: SSHCredentials): string {
+    const safeHost = credentials.host.replace(/[^a-zA-Z0-9.-]/g, '-');
+    return `${safeHost}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   private connectThroughJumpHost(
+    connectionId: string,
     credentials: SSHCredentials,
-    resolve: (value: Response<null>) => void,
+    resolve: (value: Response<{ connectionId: string }>) => void,
   ): void {
     log.info(
       `Connecting to jump host: ${credentials.jumpUsername}@${credentials.jumpHost}:${credentials.jumpPort || '22'}`,
     );
     const jumpConn = new Client();
     const targetConn = new Client();
+    SSHAuthManager.attachPasswordAuthHandler(targetConn, credentials.password);
 
     jumpConn.on('ready', () => {
       log.info(`Jump host connected: ${credentials.jumpHost}`);
@@ -88,102 +123,94 @@ export class SSHAuthManager {
         '127.0.0.1',
         0,
         credentials.host,
-        parseInt(credentials.port),
+        parseInt(credentials.port, 10),
         (err, stream) => {
           if (err) {
-            log.error('Jump host forwarding failed:', err);
             jumpConn.end();
-            return resolve(
+            resolve(
               new ErrorResponse(`Jump host forwarding failed: ${err.message}`),
             );
+            return;
           }
 
-          const targetOptions: any = {
-            sock: stream,
-            username: credentials.username,
-            password: credentials.password,
-            readyTimeout: 10000,
-            keepaliveInterval: 3000,
-            keepaliveCountMax: 2,
-          };
-
           targetConn.on('ready', () => {
-            log.info('Target host connected successfully.');
-            this.sshConnection = targetConn;
-            this.sshCredentials = credentials;
-            this.setupConnectionHandlers();
+            log.info(`Target host connected successfully: ${connectionId}`);
+            this.registerConnection(connectionId, targetConn, credentials);
             targetConn.on('close', () => jumpConn.end());
-            resolve(new SuccessResponse(null));
+            resolve(new SuccessResponse({ connectionId }));
           });
 
-          targetConn.on('error', (err) => {
-            log.error('Target host connection failed:', err);
+          targetConn.on('error', (targetError) => {
             jumpConn.end();
             resolve(
               new ErrorResponse(
-                `Target host connection failed: ${err.message}`,
+                `Target host connection failed: ${targetError.message}`,
               ),
             );
           });
 
-          targetConn.connect(targetOptions);
+          targetConn.connect({
+            sock: stream,
+            username: credentials.username,
+            password: credentials.password,
+            tryKeyboard: true,
+            readyTimeout: SSH_CONNECT_TIMEOUT,
+            keepaliveInterval: SSH_KEEPALIVE_INTERVAL,
+            keepaliveCountMax: SSH_KEEPALIVE_COUNT_MAX,
+          });
         },
       );
     });
 
     jumpConn.on('error', (err) => {
-      log.error('Jump host connection failed:', err);
       resolve(new ErrorResponse(`Jump host connection failed: ${err.message}`));
     });
 
-    const jumpPort = parseInt(credentials.jumpPort || '22', 10);
-    const hostPort = parseInt(credentials.port, 10);
     const jumpOptions: any = {
       host: credentials.jumpHost,
-      port: jumpPort,
+      port: parseInt(credentials.jumpPort || '22', 10),
       username: credentials.jumpUsername,
-      readyTimeout: 10000,
-      keepaliveInterval: 3000,
-      keepaliveCountMax: 2,
+      readyTimeout: SSH_CONNECT_TIMEOUT,
+      keepaliveInterval: SSH_KEEPALIVE_INTERVAL,
+      keepaliveCountMax: SSH_KEEPALIVE_COUNT_MAX,
     };
 
     if (credentials.jumpAuthType === 'password') {
       jumpOptions.password = credentials.jumpPassword;
       jumpConn.connect(jumpOptions);
-    } else {
-      try {
-        const keyPath =
-          credentials.jumpKeyFilePath?.replace(/^~/, os.homedir()) ||
-          path.join(os.homedir(), '.ssh', 'id_rsa');
-        if (!fs.existsSync(keyPath)) {
-          return resolve(
-            new ErrorResponse(`SSH key file not found: ${keyPath}`),
-          );
-        }
-        jumpOptions.privateKey = fs.readFileSync(keyPath);
-        jumpConn.connect(jumpOptions);
-      } catch (error) {
-        resolve(new ErrorResponse(`Failed to read SSH key: ${error.message}`));
+      return;
+    }
+
+    try {
+      const keyPath =
+        credentials.jumpKeyFilePath?.replace(/^~/, os.homedir()) ||
+        path.join(os.homedir(), '.ssh', 'id_rsa');
+      if (!fs.existsSync(keyPath)) {
+        resolve(new ErrorResponse(`私钥文件不存在: ${keyPath}`));
+        return;
       }
+      jumpOptions.privateKey = fs.readFileSync(keyPath);
+      jumpConn.connect(jumpOptions);
+    } catch (error) {
+      resolve(new ErrorResponse(`读取私钥失败: ${error.message}`));
     }
   }
 
   private connectDirectly(
+    connectionId: string,
     credentials: SSHCredentials,
-    resolve: (value: Response<null>) => void,
+    resolve: (value: Response<{ connectionId: string }>) => void,
   ): void {
     const conn = new Client();
+    SSHAuthManager.attachPasswordAuthHandler(conn, credentials.password);
     conn.on('ready', () => {
-      log.info('SSH connection successful.');
-      this.sshConnection = conn;
-      this.sshCredentials = credentials;
-      this.setupConnectionHandlers();
-      resolve(new SuccessResponse(null));
+      log.info(`SSH connection successful: ${connectionId}`);
+      this.registerConnection(connectionId, conn, credentials);
+      resolve(new SuccessResponse({ connectionId }));
     });
 
     conn.on('error', (err) => {
-      log.error('SSH connection failed:', err);
-      resolve(new ErrorResponse(`SSH connection failed: ${err.message}`));
+      resolve(new ErrorResponse(`连接失败: ${err.message}`));
     });
 
     conn.connect({
@@ -191,33 +218,76 @@ export class SSHAuthManager {
       port: parseInt(credentials.port, 10),
       username: credentials.username,
       password: credentials.password,
-      readyTimeout: 10000,
-      keepaliveInterval: 3000,
-      keepaliveCountMax: 2,
+      tryKeyboard: true,
+      readyTimeout: SSH_CONNECT_TIMEOUT,
+      keepaliveInterval: SSH_KEEPALIVE_INTERVAL,
+      keepaliveCountMax: SSH_KEEPALIVE_COUNT_MAX,
     });
   }
 
-  private handleSSHError(err: Error) {
-    log.error('SSH connection error, initiating disconnect:', err);
-    this.removeConnection();
+  private registerConnection(
+    connectionId: string,
+    connection: SSH2Client,
+    credentials: SSHCredentials,
+  ) {
+    const context: SSHConnectionContext = {
+      id: connectionId,
+      connection,
+      credentials,
+      activeTunnels: new Map(),
+      tunnelPorts: new Map(),
+      tunnelConnections: new Map(),
+      tunnelCounter: 0,
+      isDisconnecting: false,
+    };
+
+    this.connections.set(connectionId, context);
+    connection.on('error', (err) => this.handleSSHError(connectionId, err));
+    connection.on('close', () => this.handleConnectionClose(connectionId));
+    connection.on('end', () => this.handleConnectionClose(connectionId));
   }
 
-  private handleConnectionClose() {
-    log.info(
-      `SSH connection closed for: ${this.sshCredentials?.host}, initiating disconnect.`,
-    );
-    this.removeConnection();
+  public onConnectionClosed(listener: SSHConnectionClosedListener): () => void {
+    this.connectionClosedListeners.add(listener);
+    return () => this.connectionClosedListeners.delete(listener);
   }
 
-  private setupConnectionHandlers() {
-    if (!this.sshConnection) return;
-    // Use .bind(this) to ensure 'this' context is correct
-    this.sshConnection.on('error', this.handleSSHError.bind(this));
-    this.sshConnection.on('close', this.handleConnectionClose.bind(this));
+  private handleSSHError(connectionId: string, err: Error) {
+    log.error(`SSH connection error for ${connectionId}:`, err);
+    this.notifyConnectionClosed(connectionId, err.message || '连接异常');
+    this.removeConnection(connectionId);
   }
 
-  public getPublicCredentials(): PublicSSHCredentials | null {
-    if (!this.sshCredentials) {
+  private handleConnectionClose(connectionId: string) {
+    log.info(`SSH connection closed for: ${connectionId}`);
+    this.notifyConnectionClosed(connectionId, '连接已断开');
+    this.removeConnection(connectionId);
+  }
+
+  private notifyConnectionClosed(connectionId: string, reason: string) {
+    const context = this.connections.get(connectionId);
+    if (!context || context.isDisconnecting) {
+      return;
+    }
+
+    const { host, port, username } = context.credentials;
+    const event = { connectionId, host, port, username, reason };
+    this.connectionClosedListeners.forEach((listener) => listener(event));
+  }
+
+  private requireContext(connectionId: string): SSHConnectionContext {
+    const context = this.connections.get(connectionId);
+    if (!context) {
+      throw new Error(`连接未建立: ${connectionId}`);
+    }
+    return context;
+  }
+
+  public getPublicCredentials(
+    connectionId: string,
+  ): PublicSSHCredentials | null {
+    const context = this.connections.get(connectionId);
+    if (!context) {
       return null;
     }
 
@@ -231,7 +301,7 @@ export class SSHAuthManager {
       jumpUsername,
       jumpAuthType,
       jumpKeyFilePath,
-    } = this.sshCredentials;
+    } = context.credentials;
 
     return {
       host,
@@ -246,49 +316,38 @@ export class SSHAuthManager {
     };
   }
 
-  public removeConnection(
-    options: { reopenLoginWindow: boolean } = { reopenLoginWindow: true },
-  ): void {
-    if (this.isDisconnecting) {
-      log.warn('Disconnection process already in progress.');
-      return;
-    }
-    this.isDisconnecting = true;
-    log.info('Starting disconnection process...');
+  public getConnection(connectionId: string): SSH2Client {
+    return this.requireContext(connectionId).connection;
+  }
 
-    this.closeAllTunnels();
-
-    if (this.sshConnection) {
-      // Remove all listeners to prevent handleConnectionClose from being called again
-      this.sshConnection.removeAllListeners();
-      this.sshConnection.end();
-      this.sshConnection = null;
-    }
-
-    this.sshCredentials = null;
-    log.info('SSH resources cleaned up.');
-
-    if (!options.reopenLoginWindow) {
+  public removeConnection(connectionId: string): void {
+    const context = this.connections.get(connectionId);
+    if (!context || context.isDisconnecting) {
       return;
     }
 
-    // Dynamically require to avoid circular dependencies
-    // Use setImmediate to allow the current call stack to clear before creating a new window.
-    setImmediate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
-      const { windowManager } = require('.');
-      windowManager.createLoginWindow();
+    context.isDisconnecting = true;
+    this.closeAllTunnels(connectionId);
+    context.connection.removeAllListeners();
+    context.connection.end();
+    this.connections.delete(connectionId);
+    log.info(`SSH resources cleaned up: ${connectionId}`);
+  }
+
+  public removeAllConnections(): void {
+    Array.from(this.connections.keys()).forEach((connectionId) => {
+      this.removeConnection(connectionId);
     });
   }
 
-  public executeCommand(command: string): Promise<string> {
+  public executeCommand(
+    connectionId: string,
+    command: string,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
-      if (!this.sshConnection) {
-        reject(new Error('SSH connection not established.'));
-        return;
-      }
+      const { connection } = this.requireContext(connectionId);
       let output = '';
-      this.sshConnection.exec(command, (err, stream) => {
+      connection.exec(command, (err, stream) => {
         if (err) {
           reject(err);
           return;
@@ -312,22 +371,19 @@ export class SSHAuthManager {
   }
 
   public executeCommandWithStream(
+    connectionId: string,
     command: string,
     onData: (data: string) => void,
   ): Promise<number> {
     return new Promise((resolve, reject) => {
-      if (!this.sshConnection) {
-        reject(new Error('SSH connection not established.'));
-        return;
-      }
-      this.sshConnection.exec(command, (err, stream) => {
+      const { connection } = this.requireContext(connectionId);
+      connection.exec(command, (err, stream) => {
         if (err) {
           reject(err);
           return;
         }
         stream
           .on('close', (code: number) => {
-            log.info(`Command stream closed with code: ${code}`);
             resolve(code);
           })
           .on('data', (data: Buffer) => {
@@ -341,15 +397,14 @@ export class SSHAuthManager {
   }
 
   public executePtyCommand(
+    connectionId: string,
     command: string,
     onData: (data: string) => void,
     onError?: (error: string) => void,
   ): Promise<() => void> {
     return new Promise((resolve, reject) => {
-      if (!this.sshConnection) {
-        return reject(new Error('SSH connection not established.'));
-      }
-      this.sshConnection.exec(command, { pty: true }, (err, stream) => {
+      const { connection } = this.requireContext(connectionId);
+      connection.exec(command, { pty: true }, (err, stream) => {
         if (err) {
           reject(err);
           return;
@@ -372,39 +427,28 @@ export class SSHAuthManager {
   }
 
   public async createTunnel(
+    connectionId: string,
     options: TunnelOptions,
   ): Promise<Response<TunnelResult>> {
     return new Promise((resolve) => {
-      if (!this.sshConnection) {
-        return resolve(new ErrorResponse('SSH connection not established.'));
-      }
-
+      const context = this.requireContext(connectionId);
       let tunnelId: string | null = null;
       const trackedSockets = new Set<net.Socket>();
 
       const server = net.createServer((clientSocket) => {
         trackedSockets.add(clientSocket);
         let tunnelStream: ClientChannel | null = null;
-
         const safeCloseStream = () => {
           if (!tunnelStream) return;
-          if (typeof tunnelStream.close === 'function') {
-            tunnelStream.close();
-          } else {
-            tunnelStream.end();
-          }
+          if (typeof tunnelStream.close === 'function') tunnelStream.close();
+          else tunnelStream.end();
           tunnelStream = null;
         };
 
         clientSocket.on('error', (socketError) => {
-          const tunnelLabel = tunnelId ? ` (${tunnelId})` : '';
-          log.warn(
-            `Tunnel client socket error${tunnelLabel}: ${socketError.message}`,
-          );
+          log.warn(`Tunnel client socket error: ${socketError.message}`);
           safeCloseStream();
-          if (!clientSocket.destroyed) {
-            clientSocket.destroy();
-          }
+          if (!clientSocket.destroyed) clientSocket.destroy();
         });
 
         clientSocket.on('close', () => {
@@ -412,39 +456,27 @@ export class SSHAuthManager {
           trackedSockets.delete(clientSocket);
         });
 
-        this.sshConnection.forwardOut(
+        context.connection.forwardOut(
           options.sourceHost || '127.0.0.1',
           options.sourcePort || 0,
           options.remoteHost,
           options.remotePort,
           (err, stream) => {
             if (err) {
-              log.error('Tunnel forwarding error:', err);
               safeCloseStream();
-              if (!clientSocket.destroyed) {
-                clientSocket.destroy();
-              }
+              if (!clientSocket.destroyed) clientSocket.destroy();
               return;
             }
 
             tunnelStream = stream;
-
             stream.on('error', (streamError) => {
-              const tunnelLabel = tunnelId ? ` (${tunnelId})` : '';
-              log.warn(
-                `SSH tunnel stream error${tunnelLabel}: ${streamError.message}`,
-              );
               safeCloseStream();
               clientSocket.destroy(streamError);
             });
-
             stream.on('close', () => {
               safeCloseStream();
-              if (!clientSocket.destroyed) {
-                clientSocket.destroy();
-              }
+              if (!clientSocket.destroyed) clientSocket.destroy();
             });
-
             clientSocket.pipe(stream).pipe(clientSocket);
           },
         );
@@ -452,40 +484,65 @@ export class SSHAuthManager {
 
       server.listen(options.localPort, options.localHost, () => {
         const { port } = server.address() as net.AddressInfo;
-        tunnelId = `tunnel_${++this.tunnelCounter}`;
-        this.activeTunnels.set(tunnelId, server);
-        this.tunnelConnections.set(tunnelId, trackedSockets);
+        context.tunnelCounter += 1;
+        tunnelId = `${connectionId}_tunnel_${context.tunnelCounter}`;
+        context.activeTunnels.set(tunnelId, server);
+        context.tunnelPorts.set(tunnelId, port);
+        context.tunnelConnections.set(tunnelId, trackedSockets);
         resolve(new SuccessResponse({ localPort: port, tunnelId }));
       });
 
       server.on('error', (err) => {
-        log.error('Tunnel server error:', err);
         resolve(new ErrorResponse(`Tunnel server error: ${err.message}`));
       });
     });
   }
 
-  public closeTunnel(tunnelId: string): Response<boolean> {
-    const server = this.activeTunnels.get(tunnelId);
-    if (!server) return new ErrorResponse('Tunnel not found.');
-    const sockets = this.tunnelConnections.get(tunnelId);
+  public closeTunnel(
+    connectionId: string,
+    tunnelId: string | null,
+  ): Response<boolean> {
+    if (!tunnelId) return new SuccessResponse(true);
+
+    const context = this.connections.get(connectionId);
+    if (!context) return new SuccessResponse(true);
+
+    const server = context.activeTunnels.get(tunnelId);
+    if (!server) return new SuccessResponse(true);
+    const sockets = context.tunnelConnections.get(tunnelId);
     sockets?.forEach((socket) => socket.destroy());
-    server.close();
-    this.activeTunnels.delete(tunnelId);
-    this.tunnelConnections.delete(tunnelId);
+    try {
+      server.close();
+    } catch (error) {
+      log.warn(`关闭隧道服务失败:`, error);
+    }
+    context.activeTunnels.delete(tunnelId);
+    context.tunnelPorts.delete(tunnelId);
+    context.tunnelConnections.delete(tunnelId);
     return new SuccessResponse(true);
   }
 
-  public closeAllTunnels(): void {
-    log.info(`Closing ${this.activeTunnels.size} active tunnels.`);
-    this.activeTunnels.forEach((server, tunnelId) => {
-      const sockets = this.tunnelConnections.get(tunnelId);
+  public getTunnel(
+    connectionId: string,
+    tunnelId: string,
+  ): { localPort: number } | null {
+    const context = this.connections.get(connectionId);
+    const localPort = context?.tunnelPorts.get(tunnelId);
+    if (!localPort) return null;
+    return { localPort };
+  }
+
+  public closeAllTunnels(connectionId: string): void {
+    const context = this.connections.get(connectionId);
+    if (!context) return;
+    context.activeTunnels.forEach((server, tunnelId) => {
+      const sockets = context.tunnelConnections.get(tunnelId);
       sockets?.forEach((socket) => socket.destroy());
       server.close();
-      log.info(`Tunnel closed: ${tunnelId}`);
     });
-    this.activeTunnels.clear();
-    this.tunnelConnections.clear();
+    context.activeTunnels.clear();
+    context.tunnelPorts.clear();
+    context.tunnelConnections.clear();
   }
 }
 

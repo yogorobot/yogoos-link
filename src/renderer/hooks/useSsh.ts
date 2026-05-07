@@ -11,14 +11,17 @@ export const useSSH = () => {
       console.error('Failed to authenticate SSH:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'SSH 连接失败',
+        error: error instanceof Error ? error.message : '连接失败',
       };
     }
   }, []);
 
-  const disconnect = useCallback(async () => {
+  const disconnect = useCallback(async (connectionId: string) => {
     try {
-      return await window.electron.ipcRenderer.invoke('ssh:disconnect');
+      return await window.electron.ipcRenderer.invoke(
+        'ssh:disconnect-by-id',
+        connectionId,
+      );
     } catch (error) {
       console.error('Failed to disconnect SSH:', error);
       return {

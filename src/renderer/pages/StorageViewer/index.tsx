@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import WindowTitlebar from '../../components/WindowTitlebar';
 import { useSystem } from '../../hooks';
 
 // --- TYPE DEFINITIONS ---
@@ -101,10 +102,11 @@ const StorageViewer = () => {
   }, [fetchStorageInfo]);
 
   return (
-    <div className="w-full h-screen bg-gray-900/90 text-white font-sans flex flex-col">
+    <div className="yogo-page flex h-screen w-full flex-col font-sans text-slate-100">
+      <WindowTitlebar fallbackTitle="设备存储" />
       {/* Fixed Header */}
-      <div className="flex-shrink-0 bg-gray-900/80 backdrop-blur-sm border-b border-white/10 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+      <div className="flex-shrink-0 border-b border-white/10 bg-slate-950/70 px-6 py-4 backdrop-blur-sm [-webkit-app-region:no-drag] max-sm:px-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 max-sm:flex-col max-sm:items-start">
           <h1 className="text-2xl font-bold text-cyan-300">设备存储信息</h1>
           <div className="text-right">
             <div className="flex items-center justify-end gap-2 text-sm text-gray-400">
@@ -121,7 +123,7 @@ const StorageViewer = () => {
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 [-webkit-app-region:no-drag] max-sm:p-4">
         <div className="max-w-7xl mx-auto">
           {isLoading && (
             <div className="text-center text-gray-400 py-10">正在加载...</div>
@@ -134,7 +136,7 @@ const StorageViewer = () => {
           )}
 
           {!isLoading && !error && (
-            <div className="overflow-x-auto rounded-lg border border-gray-700/50 bg-gray-800/40">
+            <div className="yogo-panel overflow-x-auto rounded-lg">
               <table className="min-w-full divide-y divide-gray-700/50">
                 <thead className="bg-gray-800/60">
                   <tr>
@@ -195,7 +197,7 @@ const StorageViewer = () => {
       </div>
 
       {/* Fixed Footer */}
-      <div className="flex-shrink-0 bg-gray-900/80 backdrop-blur-sm border-t border-white/10 px-6 py-4">
+      <div className="flex-shrink-0 border-t border-white/10 bg-slate-950/70 px-6 py-4 backdrop-blur-sm max-sm:px-4">
         <div className="max-w-7xl mx-auto flex justify-center">
           <span className="text-gray-400 text-sm">实时显示设备存储信息</span>
         </div>

@@ -56,8 +56,14 @@ class Logs {
 
   window: BrowserWindow | null = null;
 
-  constructor(windowId: number) {
+  private connectionId: string;
+
+  constructor(windowId: number, connectionId?: string) {
     this.window = BrowserWindow.fromId(windowId);
+    if (!connectionId) {
+      throw new Error('日志窗口没有绑定连接');
+    }
+    this.connectionId = connectionId;
     this.window.once('closed', () => {
       this.window = null;
       this.cleanup();
@@ -70,7 +76,10 @@ class Logs {
       ? '/var/run/log/meteor.log'
       : '/var/log/apps/macross.log';
 
-    const result = await sshManager.executeCommand(`ls -l ${logFile}`);
+    const result = await sshManager.executeCommand(
+      this.connectionId,
+      `ls -l ${logFile}`,
+    );
     console.log(result);
 
     return formatFileList(result);
@@ -79,6 +88,7 @@ class Logs {
   // eslint-disable-next-line class-methods-use-this
   async getHistoryLogList() {
     const result = await sshManager.executeCommand(
+      this.connectionId,
       `ls -l /var/log/meteor-*.gz`,
     );
 
@@ -87,12 +97,8 @@ class Logs {
 
   // eslint-disable-next-line class-methods-use-this
   async checkLogMeteorFile() {
-    const { sshConnection } = sshManager;
-    if (!sshConnection) {
-      throw new Error('SSH连接未建立');
-    }
-
     const checkResult = await sshManager.executeCommand(
+      this.connectionId,
       '[ -f /var/run/log/meteor.log ] && echo "exists" || echo "not exists"',
     );
 
@@ -111,16 +117,11 @@ class Logs {
 
   async getStreamRealtime(options) {
     // const targetWindow = BrowserWindow.fromId(windowId);
-    const { sshConnection } = sshManager;
     const { fileName, requestId, filters } = options;
 
     // 检查窗口是否存在
     if (!this.window || this.window.isDestroyed()) {
       throw new Error('目标窗口不存在或已销毁');
-    }
-
-    if (!sshConnection) {
-      throw new Error('SSH连接未建立');
     }
 
     const filterCommand = buildFilterCommand(filters);
@@ -136,29 +137,28 @@ class Logs {
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send(`log:stream-start-${requestId}`);
     }
-    const stop = await sshManager.executePtyCommand(command, (data) => {
-      // 处理实时日志数据
-      // 检查窗口是否仍然存在
-      if (this.window && !this.window.isDestroyed()) {
-        this.window.webContents.send(`log:stream-data-${requestId}`, data);
-      }
-    });
+    const stop = await sshManager.executePtyCommand(
+      this.connectionId,
+      command,
+      (data) => {
+        // 处理实时日志数据
+        // 检查窗口是否仍然存在
+        if (this.window && !this.window.isDestroyed()) {
+          this.window.webContents.send(`log:stream-data-${requestId}`, data);
+        }
+      },
+    );
 
     this.processMap.set(requestId, stop);
   }
 
   async getStreamHistory(options) {
     // const targetWindow = BrowserWindow.fromId(windowId);
-    const { sshConnection } = sshManager;
     const { fileName, requestId, filters } = options;
 
     // 检查窗口是否存在
     if (!this.window || this.window.isDestroyed()) {
       throw new Error('目标窗口不存在或已销毁');
-    }
-
-    if (!sshConnection) {
-      throw new Error('SSH连接未建立');
     }
 
     const filterCommand = buildFilterCommand(filters);
@@ -172,13 +172,17 @@ class Logs {
 
     console.log('::::::::::::::::开始获取历史日志----', requestId);
     // targetWindow.webContents.send(`log:stream-start-${requestId}`);
-    const stop = await sshManager.executePtyCommand(command, (data) => {
-      // 处理实时日志数据
-      // 检查窗口是否仍然存在
-      if (this.window && !this.window.isDestroyed()) {
-        this.window.webContents.send(`log:stream-data-${requestId}`, data);
-      }
-    });
+    const stop = await sshManager.executePtyCommand(
+      this.connectionId,
+      command,
+      (data) => {
+        // 处理实时日志数据
+        // 检查窗口是否仍然存在
+        if (this.window && !this.window.isDestroyed()) {
+          this.window.webContents.send(`log:stream-data-${requestId}`, data);
+        }
+      },
+    );
 
     this.processMap.set(requestId, stop);
   }

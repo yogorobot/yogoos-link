@@ -1,14 +1,5 @@
 import { BrowserWindowConstructorOptions } from 'electron';
-import { useState, useEffect, useCallback } from 'react';
-
-interface WindowInfo {
-  id: number;
-  title: string;
-  bounds: { x: number; y: number; width: number; height: number };
-  isMaximized: boolean;
-  isMinimized: boolean;
-  isFocused: boolean;
-}
+import { useCallback } from 'react';
 
 export const useWindow = () => {
   // 设置窗口大小，可选择是否居中显示
@@ -96,12 +87,17 @@ export const useWindow = () => {
   }, []);
 
   const createWindow = useCallback(
-    async (filePath: string, options?: BrowserWindowConstructorOptions) => {
+    async (
+      filePath: string,
+      options?: BrowserWindowConstructorOptions,
+      connectionId?: string,
+    ) => {
       try {
         return await window.electron.ipcRenderer.invoke(
           'window:create',
           filePath,
           options,
+          connectionId,
         );
       } catch (error) {
         console.error('Failed to create window:', error);

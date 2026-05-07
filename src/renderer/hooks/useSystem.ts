@@ -5,8 +5,8 @@ export const useSystem = () => {
     return window.electron.ipcRenderer.invoke('system:getStorageInfo');
   }, []);
 
-  const systemReboot = useCallback(() => {
-    return window.electron.ipcRenderer.invoke('system:reboot');
+  const systemReboot = useCallback((connectionId?: string) => {
+    return window.electron.ipcRenderer.invoke('system:reboot', connectionId);
   }, []);
 
   const systemShutdown = useCallback(() => {
@@ -19,3 +19,5 @@ export const useSystem = () => {
     systemShutdown,
   };
 };
+
+export default useSystem;

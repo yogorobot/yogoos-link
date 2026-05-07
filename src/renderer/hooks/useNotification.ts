@@ -13,7 +13,7 @@ export const useNotification = () => {
       const { title, body, type = 'info', silent = false } = options;
 
       // 根据类型设置默认标题
-      let defaultTitle = 'SSH Inspector';
+      let defaultTitle = 'YOLINK';
       switch (type) {
         case 'success':
           defaultTitle = '✅ 操作成功';
@@ -26,6 +26,8 @@ export const useNotification = () => {
           break;
         case 'info':
           defaultTitle = 'ℹ️ 提示';
+          break;
+        default:
           break;
       }
 
