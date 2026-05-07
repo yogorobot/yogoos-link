@@ -4,9 +4,62 @@ on:
   push:
     tags:
       - 'v*.*.*'
+      - 'testing-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Release channel'
+        required: true
+        default: 'testing'
+        type: choice
+        options:
+          - testing
+          - stable
+      version:
+        description: 'Version name, for example 1.2.3-testing.1'
+        required: true
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      release_name: ${{ steps.meta.outputs.release_name }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - name: Prepare release metadata
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+            CHANNEL="${{ inputs.channel }}"
+            if [ "$CHANNEL" = "testing" ]; then
+              TAG="testing-v${VERSION#v}"
+              PRERELEASE="true"
+              NAME="Testing ${TAG}"
+            else
+              TAG="v${VERSION#v}"
+              PRERELEASE="false"
+              NAME="Release ${TAG}"
+            fi
+          else
+            TAG="${{ github.ref_name }}"
+            if [[ "$TAG" == *"testing"* ]]; then
+              PRERELEASE="true"
+              NAME="Testing ${TAG}"
+            else
+              PRERELEASE="false"
+              NAME="Release ${TAG}"
+            fi
+          fi
+
+          echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release_name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
   create-release:
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -14,15 +67,17 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          name: ${{ needs.prepare.outputs.release_name }}
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.prepare.outputs.prerelease }}
 
   build:
-    needs: create-release
+    needs:
+      - prepare
+      - create-release
     runs-on: ${{ matrix.os }}
-    
+
     permissions:
       contents: write
 
@@ -61,7 +116,7 @@ jobs:
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
           files: |
             release/build/*.dmg
             release/build/*.zip
