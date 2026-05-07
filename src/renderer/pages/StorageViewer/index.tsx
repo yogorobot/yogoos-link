@@ -45,14 +45,14 @@ const parseStorageInfo = (dfOutput: string): StorageEntry[] => {
 const ProgressBar = ({ value }: ProgressBarProps) => {
   const getBarColor = () => {
     if (value > 90) return 'bg-red-500';
-    if (value > 70) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (value > 70) return 'bg-amber-400';
+    return 'bg-blue-400';
   };
 
   return (
-    <div className="w-full bg-gray-700 rounded-full h-2.5">
+    <div className="h-2 w-full rounded-full bg-slate-800">
       <div
-        className={`h-2.5 rounded-full ${getBarColor()}`}
+        className={`h-2 rounded-full transition-all ${getBarColor()}`}
         style={{ width: `${value}%` }}
       />
     </div>
@@ -102,43 +102,44 @@ const StorageViewer = () => {
   }, [fetchStorageInfo]);
 
   return (
-    <div className="yogo-page flex h-screen w-full flex-col font-sans text-slate-100">
+    <div className="yogo-page flex h-screen w-full flex-col overflow-hidden font-sans text-slate-100">
       <WindowTitlebar fallbackTitle="设备存储" />
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 border-b border-white/10 bg-slate-950/70 px-6 py-4 backdrop-blur-sm [-webkit-app-region:no-drag] max-sm:px-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 max-sm:flex-col max-sm:items-start">
-          <h1 className="text-2xl font-bold text-cyan-300">设备存储信息</h1>
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-2 text-sm text-gray-400">
-              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-              <span>每5秒自动刷新</span>
-            </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 [-webkit-app-region:no-drag]">
+        <section className="yogo-panel flex items-center justify-between gap-4 rounded-3xl px-5 py-4 max-sm:flex-col max-sm:items-start max-sm:px-4">
+          <div>
+            <p className="text-sm font-medium text-slate-400">设备存储</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-100">
+              {isLoading ? '-' : storageEntries.length}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-slate-500 max-sm:w-full max-sm:justify-between">
+            <span>每5秒自动刷新</span>
             {lastUpdated && (
-              <div className="text-xs text-gray-500 mt-1">
-                最近刷新于: {lastUpdated.toLocaleTimeString()}
-              </div>
+              <span className="text-slate-600">
+                上次更新: {lastUpdated.toLocaleTimeString()}
+              </span>
             )}
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-6 [-webkit-app-region:no-drag] max-sm:p-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="min-h-0 flex-1">
           {isLoading && (
-            <div className="text-center text-gray-400 py-10">正在加载...</div>
+            <div className="yogo-panel rounded-3xl px-5 py-8 text-center text-sm text-slate-400">
+              正在加载...
+            </div>
           )}
 
           {error && (
-            <div className="bg-red-900/50 border border-red-500/50 text-red-300 p-4 rounded-lg">
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
               {error}
             </div>
           )}
 
           {!isLoading && !error && (
-            <div className="yogo-panel overflow-x-auto rounded-lg">
-              <table className="min-w-full divide-y divide-gray-700/50">
-                <thead className="bg-gray-800/60">
+            <div className="yogo-panel overflow-x-auto rounded-3xl p-2">
+              <table className="min-w-full divide-y divide-slate-800/80">
+                <thead>
                   <tr>
                     {[
                       '文件系统',
@@ -151,32 +152,32 @@ const StorageViewer = () => {
                       <th
                         key={header}
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                        className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400"
                       >
                         {header}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="bg-gray-900/50 divide-y divide-gray-700/50">
+                <tbody className="divide-y divide-slate-800/70">
                   {storageEntries.map((entry) => (
                     <tr
                       key={`${entry.filesystem}-${entry.mountedOn}`}
-                      className="hover:bg-gray-700/40 transition-colors duration-200"
+                      className="transition-colors hover:bg-slate-800/45"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-cyan-300">
+                      <td className="whitespace-nowrap px-4 py-4 font-mono text-sm text-blue-200">
                         {entry.filesystem}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-300">
                         {entry.size}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-300">
                         {entry.used}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-300">
                         {entry.available}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-300">
                         <div className="flex items-center gap-3">
                           <div className="w-24">
                             <ProgressBar value={entry.capacityPercent} />
@@ -184,7 +185,7 @@ const StorageViewer = () => {
                           <span>{entry.capacity}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-400">
+                      <td className="whitespace-nowrap px-4 py-4 font-mono text-sm text-slate-400">
                         {entry.mountedOn}
                       </td>
                     </tr>
@@ -193,13 +194,6 @@ const StorageViewer = () => {
               </table>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Fixed Footer */}
-      <div className="flex-shrink-0 border-t border-white/10 bg-slate-950/70 px-6 py-4 backdrop-blur-sm max-sm:px-4">
-        <div className="max-w-7xl mx-auto flex justify-center">
-          <span className="text-gray-400 text-sm">实时显示设备存储信息</span>
         </div>
       </div>
     </div>

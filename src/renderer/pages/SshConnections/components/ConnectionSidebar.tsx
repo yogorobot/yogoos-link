@@ -5,6 +5,7 @@ type ButtonClickEvent = MouseEvent<HTMLButtonElement>;
 
 interface ConnectionSidebarProps {
   records: SshConnectionRecord[];
+  recordCount: number;
   activeConnections: Record<string, ActiveConnection>;
   selectedRecordId?: string;
   connectingId: string | null;
@@ -15,6 +16,8 @@ interface ConnectionSidebarProps {
   onConnect: (record: SshConnectionRecord) => void;
   onDelete: (record: SshConnectionRecord) => void;
   onDisconnect: (record: SshConnectionRecord, connectionId: string) => void;
+  onDisconnectAll: () => void;
+  onClearAll: () => void;
 }
 
 const formatUpdatedAt = (updatedAt: number) =>
@@ -27,6 +30,7 @@ const formatUpdatedAt = (updatedAt: number) =>
 
 export default function ConnectionSidebar({
   records,
+  recordCount,
   activeConnections,
   selectedRecordId,
   connectingId,
@@ -37,7 +41,13 @@ export default function ConnectionSidebar({
   onConnect,
   onDelete,
   onDisconnect,
+  onDisconnectAll,
+  onClearAll,
 }: ConnectionSidebarProps) {
+  const activeConnectionCount = Object.keys(activeConnections).length;
+  const hasRecords = recordCount > 0;
+  const hasActiveConnections = activeConnectionCount > 0;
+
   return (
     <aside className="yogo-panel flex min-h-0 w-86 shrink-0 flex-col rounded-3xl max-[860px]:w-full">
       <header className="border-b border-slate-700/70 p-4">
@@ -170,6 +180,31 @@ export default function ConnectionSidebar({
           </div>
         )}
       </div>
+
+      <footer className="border-t border-slate-700/70 p-3">
+        <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+          <span>已连接 {activeConnectionCount}</span>
+          <span>历史 {recordCount}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="yogo-button-secondary rounded-xl px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-45"
+            disabled={!hasActiveConnections}
+            onClick={onDisconnectAll}
+          >
+            全部断开
+          </button>
+          <button
+            type="button"
+            className="yogo-button-danger rounded-xl px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-45"
+            disabled={!hasRecords && !hasActiveConnections}
+            onClick={onClearAll}
+          >
+            一键清空
+          </button>
+        </div>
+      </footer>
     </aside>
   );
 }

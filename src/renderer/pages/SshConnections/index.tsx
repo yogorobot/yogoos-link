@@ -155,7 +155,10 @@ export default function SshConnections() {
       : [nextRecord, ...records];
 
     persistRecords(nextRecords);
-    setEditingRecord(nextRecord);
+    setEditingRecord(null);
+    setShowForm(false);
+    setFormErrors({});
+    setFormValues(createDefaultFormValues());
     showSuccess('连接配置已保存');
     return nextRecord;
   };
@@ -310,6 +313,51 @@ export default function SshConnections() {
     showSuccess('连接已断开');
   };
 
+  const disconnectConnections = async (
+    connections: ActiveConnection[],
+  ): Promise<boolean> => {
+    if (connections.length === 0) return true;
+
+    const results = await Promise.all(
+      connections.map((connection) => disconnect(connection.connectionId)),
+    );
+    const failedResult = results.find((result) => !result.success);
+
+    if (failedResult) {
+      showError(failedResult.error || '断开连接失败');
+      return false;
+    }
+
+    return true;
+  };
+
+  const disconnectAllConnections = async () => {
+    const connections = Object.values(activeConnections);
+    const success = await disconnectConnections(connections);
+    if (!success) return;
+
+    setActiveConnections({});
+    setWorkspaceBusyConnections({});
+    setSelectedRecordId(null);
+    showSuccess('全部连接已断开');
+  };
+
+  const clearAllConnections = async () => {
+    const connections = Object.values(activeConnections);
+    const success = await disconnectConnections(connections);
+    if (!success) return;
+
+    persistRecords([]);
+    setActiveConnections({});
+    setWorkspaceBusyConnections({});
+    setSelectedRecordId(null);
+    setEditingRecord(null);
+    setShowForm(false);
+    setFormErrors({});
+    setSearchTerm('');
+    showSuccess('已断开全部连接并清空历史');
+  };
+
   const selectKeyFile = async () => {
     const { data, success } = await showOpenDialog({
       title: '选择私钥文件',
@@ -351,6 +399,7 @@ export default function SshConnections() {
         >
           <ConnectionSidebar
             records={filteredRecords}
+            recordCount={records.length}
             activeConnections={activeConnections}
             selectedRecordId={selectedRecordId || undefined}
             connectingId={connectingId}
@@ -361,6 +410,8 @@ export default function SshConnections() {
             onConnect={openConnectionForm}
             onDelete={deleteRecord}
             onDisconnect={disconnectRecord}
+            onDisconnectAll={disconnectAllConnections}
+            onClearAll={clearAllConnections}
           />
         </div>
         <ConnectionWorkspacePanel

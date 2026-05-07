@@ -51,33 +51,18 @@ function LogFilter({
   };
 
   return (
-    <div className="absolute top-16 right-2 z-10 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl w-96 max-h-[600px] overflow-y-auto">
-      <div className="sticky top-0 bg-gray-900 border-b border-gray-700 p-4 pb-3">
+    <div className="yogo-panel absolute right-3 top-14 z-20 max-h-[min(34rem,calc(100%-4rem))] w-96 overflow-y-auto rounded-3xl max-sm:left-3 max-sm:right-3 max-sm:w-auto">
+      <div className="sticky top-0 border-b border-slate-800/80 bg-slate-950/95 p-4 pb-3 backdrop-blur-xl">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white flex items-center">
-            <svg
-              className="w-5 h-5 mr-2 text-indigo-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"
-              />
-            </svg>
-            日志过滤器
-          </h3>
+          <h3 className="text-base font-semibold text-slate-100">日志过滤器</h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-800/80 hover:text-slate-100"
             aria-label="关闭过滤器"
           >
             <svg
-              className="w-5 h-5"
+              className="h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -93,12 +78,12 @@ function LogFilter({
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="space-y-4 p-4">
         {/* Search Term */}
         <div>
           <label
             htmlFor="filter-input"
-            className="block text-sm font-medium text-gray-300 mb-2"
+            className="mb-2 block text-sm font-medium text-slate-300"
           >
             搜索关键词
           </label>
@@ -108,26 +93,26 @@ function LogFilter({
             value={filters.searchTerm || ''}
             onChange={(e) => handleSearchTermChange(e.target.value)}
             placeholder="例如: ERROR 或 [Face]"
-            className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            className="yogo-input w-full rounded-xl px-3 py-2.5 text-sm transition"
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 onApply();
               }
             }}
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="mt-1.5 text-xs text-slate-500">
             留空显示所有内容，使用固定字符串匹配
           </p>
         </div>
 
         {/* Case Sensitivity */}
         <div className="flex items-center space-x-3">
-          <label className="flex items-center text-sm text-gray-300 cursor-pointer">
+          <label className="flex cursor-pointer items-center text-sm text-slate-300">
             <input
               type="checkbox"
               checked={filters.caseSensitive}
               onChange={(e) => handleCaseSensitiveChange(e.target.checked)}
-              className="mr-2 w-4 h-4 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500 focus:ring-2"
+              className="mr-2 h-4 w-4 rounded border-slate-600 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50"
             />
             区分大小写
           </label>
@@ -137,10 +122,10 @@ function LogFilter({
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+          className="flex items-center text-sm font-medium text-blue-300 transition-colors hover:text-blue-200"
         >
           <svg
-            className={`w-4 h-4 mr-1 transform transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+            className={`mr-1 h-4 w-4 transform transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -157,12 +142,12 @@ function LogFilter({
 
         {/* Advanced Options */}
         {showAdvanced && (
-          <div className="space-y-4 pt-2 border-t border-gray-700">
+          <div className="space-y-4 border-t border-slate-800/80 pt-4">
             {/* Exclude Terms */}
             <div>
               <label
                 htmlFor="exclude-input"
-                className="block text-sm font-medium text-gray-300 mb-2"
+                className="mb-2 block text-sm font-medium text-slate-300"
               >
                 排除关键词 (逗号分隔)
               </label>
@@ -172,9 +157,9 @@ function LogFilter({
                 value={filters.excludeTerms?.join(', ') || ''}
                 onChange={(e) => handleExcludeTermsChange(e.target.value)}
                 placeholder="例如: DEBUG, TRACE, heartbeat"
-                className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="yogo-input w-full rounded-xl px-3 py-2.5 text-sm transition"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="mt-1.5 text-xs text-slate-500">
                 排除包含这些关键词的日志行
               </p>
             </div>
@@ -182,45 +167,19 @@ function LogFilter({
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 border-t border-slate-800/80 pt-4">
           <button
             type="button"
             onClick={onApply}
-            className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white py-2 px-4 rounded-md text-sm font-medium transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+            className="yogo-button-primary flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition"
           >
-            <svg
-              className="inline-block w-4 h-4 mr-1"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
             应用过滤
           </button>
           <button
             type="button"
             onClick={onClear}
-            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-md text-sm font-medium transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+            className="yogo-button-secondary flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition"
           >
-            <svg
-              className="inline-block w-4 h-4 mr-1"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
             重置
           </button>
         </div>

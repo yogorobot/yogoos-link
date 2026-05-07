@@ -57,18 +57,24 @@ const Index = () => {
   }, [selectedFile, filters, time]);
 
   return (
-    <div className="yogo-page relative flex h-full min-h-0 w-full flex-col">
+    <div className="yogo-page relative flex h-full min-h-0 w-full flex-col overflow-hidden">
       <WindowTitlebar fallbackTitle="实时日志" />
-      {requestId && (
-        <StreamView
-          key={requestId}
-          type="realtime"
-          filters={filters}
-          defaultFilters={defaultFilters}
-          onFilterChange={onFilterChange}
-          requestId={requestId}
-        />
-      )}
+      <div className="min-h-0 flex-1 overflow-hidden [-webkit-app-region:no-drag]">
+        {requestId ? (
+          <StreamView
+            key={requestId}
+            type="realtime"
+            filters={filters}
+            defaultFilters={defaultFilters}
+            onFilterChange={onFilterChange}
+            requestId={requestId}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-sm text-slate-400">
+            正在准备实时日志...
+          </div>
+        )}
+      </div>
     </div>
   );
 };

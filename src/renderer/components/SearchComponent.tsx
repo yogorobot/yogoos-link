@@ -35,15 +35,15 @@ const SearchComponent: React.FC<SearchComponentProps> = ({
   };
 
   return (
-    <div className={`w-full bg-gray-800 ${className}`}>
-      <div className="flex items-center gap-1 p-3 py-2">
+    <div className={`w-full bg-transparent ${className}`}>
+      <div className="flex items-center gap-1 px-2 py-2">
         <button
           type="button"
           onClick={() => onCaseSensitiveChange(!caseSensitive)}
-          className={`p-2 text-sm rounded focus:outline-none transition-colors ${
+          className={`rounded-lg border p-2 text-sm transition-colors focus:outline-none ${
             caseSensitive
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white'
+              ? 'border-blue-400/40 bg-blue-500/20 text-blue-100 hover:bg-blue-500/28'
+              : 'border-slate-800 bg-slate-950/35 text-slate-400 hover:bg-slate-800/80 hover:text-slate-100'
           }`}
           title="区分大小写"
         >
@@ -58,11 +58,11 @@ const SearchComponent: React.FC<SearchComponentProps> = ({
             onChange={(e) => onSearchTextChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="搜索..."
-            className="w-full px-3 py-2 pr-20 text-sm bg-gray-700 text-white border border-gray-600 rounded focus:outline-none focus:border-indigo-500"
+            className="yogo-input w-full rounded-xl px-3 py-2 pr-20 text-sm"
           />
           {/* 搜索结果统计 - 内嵌在输入框右侧 */}
           {searchResults && searchResults.total > 0 && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 font-mono bg-gray-700 px-1">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-slate-950/80 px-1.5 font-mono text-xs text-slate-400">
               {searchResults.current}/{searchResults.total}
             </div>
           )}
@@ -73,7 +73,7 @@ const SearchComponent: React.FC<SearchComponentProps> = ({
           <button
             type="button"
             onClick={() => onSearchPrevious()}
-            className="p-2 text-sm bg-gray-700 text-white rounded hover:bg-gray-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-lg border border-slate-800 bg-slate-950/35 px-2.5 py-2 text-sm text-slate-300 transition hover:bg-slate-800/80 hover:text-slate-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             title="上一个 (Shift+Enter)"
             disabled={!searchResults || searchResults.total === 0}
           >
@@ -82,7 +82,7 @@ const SearchComponent: React.FC<SearchComponentProps> = ({
           <button
             type="button"
             onClick={() => onSearchNext()}
-            className="p-2 text-sm bg-gray-700 text-white rounded hover:bg-gray-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-lg border border-slate-800 bg-slate-950/35 px-2.5 py-2 text-sm text-slate-300 transition hover:bg-slate-800/80 hover:text-slate-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             title="下一个 (Enter)"
             disabled={!searchResults || searchResults.total === 0}
           >
@@ -95,13 +95,13 @@ const SearchComponent: React.FC<SearchComponentProps> = ({
           <button
             type="button"
             onClick={() => onSearchNext()}
-            className="p-2 text-sm bg-gray-700 text-gray-400 rounded hover:bg-gray-600 hover:text-white focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-lg border border-slate-800 bg-slate-950/35 p-2 text-sm text-slate-400 transition hover:bg-slate-800/80 hover:text-slate-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             title="搜索 (Enter)"
             aria-label="搜索"
             disabled={!searchText}
           >
             <svg
-              className="w-4 h-4"
+              className="h-4 w-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
