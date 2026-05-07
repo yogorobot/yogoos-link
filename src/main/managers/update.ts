@@ -20,7 +20,16 @@ export interface AppUpdateState {
   releaseNotes?: string | null;
   progress?: number;
   error?: string;
+  hasRequiredAssets?: boolean;
   isTestingChannel: boolean;
+}
+
+interface GitHubReleaseAsset {
+  name: string;
+}
+
+interface GitHubRelease {
+  assets?: GitHubReleaseAsset[];
 }
 
 class UpdateManager {
@@ -46,7 +55,7 @@ class UpdateManager {
     });
 
     autoUpdater.on('update-available', (info) => {
-      this.setUpdateInfo('available', info);
+      this.handleUpdateAvailable(info);
     });
 
     autoUpdater.on('update-not-available', (info) => {
@@ -135,7 +144,33 @@ class UpdateManager {
       releaseNotes: UpdateManager.stringifyReleaseNotes(info.releaseNotes),
       progress,
       error: undefined,
+      hasRequiredAssets: status === 'available' || status === 'downloaded',
     });
+  }
+
+  private async handleUpdateAvailable(info: UpdateInfo): Promise<void> {
+    try {
+      const hasRequiredAssets = await UpdateManager.hasRequiredReleaseAssets(
+        info.version,
+      );
+
+      if (!hasRequiredAssets) {
+        log.warn(`更新 ${info.version} 缺少当前平台所需资源，跳过更新提示`);
+        this.setUpdateInfo('not-available', info);
+        this.setState({ hasRequiredAssets: false });
+        return;
+      }
+
+      this.setUpdateInfo('available', info);
+    } catch (error) {
+      const message = UpdateManager.normalizeUpdateError(
+        error,
+        '更新资源校验失败',
+      );
+      log.warn(`更新 ${info.version} 资源校验失败：${message}`);
+      this.setUpdateInfo('not-available', info);
+      this.setState({ hasRequiredAssets: false });
+    }
   }
 
   private setDownloadProgress(progress: ProgressInfo): void {
@@ -185,6 +220,62 @@ class UpdateManager {
     }
 
     return message || fallback;
+  }
+
+  private static async hasRequiredReleaseAssets(
+    version: string,
+  ): Promise<boolean> {
+    const tag = version.startsWith('v') ? version : `v${version}`;
+    const response = await fetch(
+      `https://api.github.com/repos/yogorobot/yogoos-link/releases/tags/${tag}`,
+      {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'yolink-updater',
+        },
+      },
+    );
+
+    if (!response.ok) return false;
+
+    const release = (await response.json()) as GitHubRelease;
+    const assetNames = (release.assets || []).map((asset) => asset.name);
+
+    return UpdateManager.hasPlatformAssets(assetNames);
+  }
+
+  private static hasPlatformAssets(assetNames: string[]): boolean {
+    const hasAsset = (matcher: (assetName: string) => boolean) =>
+      assetNames.some(matcher);
+
+    if (process.platform === 'darwin') {
+      return (
+        hasAsset((assetName) => assetName === 'latest-mac.yml') &&
+        hasAsset((assetName) =>
+          ['.dmg', '.zip'].some((extension) => assetName.endsWith(extension)),
+        )
+      );
+    }
+
+    if (process.platform === 'win32') {
+      return (
+        hasAsset((assetName) => assetName === 'latest.yml') &&
+        hasAsset((assetName) => assetName.endsWith('.exe'))
+      );
+    }
+
+    if (process.platform === 'linux') {
+      return (
+        hasAsset((assetName) => assetName === 'latest-linux.yml') &&
+        hasAsset((assetName) =>
+          ['.AppImage', '.deb', '.rpm'].some((extension) =>
+            assetName.endsWith(extension),
+          ),
+        )
+      );
+    }
+
+    return false;
   }
 
   private static stringifyReleaseNotes(
