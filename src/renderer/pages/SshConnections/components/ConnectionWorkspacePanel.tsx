@@ -1,5 +1,9 @@
 import { BrowserWindowConstructorOptions } from 'electron';
-import type { ActiveConnection, SshConnectionRecord } from '../types';
+import type {
+  ActiveConnection,
+  PendingConnection,
+  SshConnectionRecord,
+} from '../types';
 
 interface WorkspaceAction {
   id: string;
@@ -80,6 +84,7 @@ const workspaceActions: WorkspaceAction[] = [
 interface ConnectionWorkspacePanelProps {
   record: SshConnectionRecord | null;
   connection: ActiveConnection | null;
+  pendingConnection: PendingConnection | null;
   isBusy: boolean;
   deviceCount: number;
   onToggleSidebar: () => void;
@@ -90,6 +95,7 @@ interface ConnectionWorkspacePanelProps {
   onReboot: () => void;
   onCreate: () => void;
   onConnect: (record: SshConnectionRecord) => void;
+  onCancelConnect: (connectionId: string) => void;
   onDelete: (record: SshConnectionRecord) => void;
   onDisconnect: (record: SshConnectionRecord, connectionId: string) => void;
 }
@@ -97,6 +103,7 @@ interface ConnectionWorkspacePanelProps {
 export default function ConnectionWorkspacePanel({
   record,
   connection,
+  pendingConnection,
   isBusy,
   deviceCount,
   onToggleSidebar,
@@ -104,6 +111,7 @@ export default function ConnectionWorkspacePanel({
   onReboot,
   onCreate,
   onConnect,
+  onCancelConnect,
   onDelete,
   onDisconnect,
 }: ConnectionWorkspacePanelProps) {
@@ -168,6 +176,115 @@ export default function ConnectionWorkspacePanel({
   }
 
   const isConnected = Boolean(connection);
+  const isConnecting = Boolean(pendingConnection);
+  const isUnstable = connection?.healthStatus === 'unstable';
+  let statusDotClass = 'bg-slate-500';
+  let statusBadgeClass = 'border-slate-600 bg-slate-800/80 text-slate-400';
+  let statusLabel = '离线';
+  if (isUnstable) {
+    statusDotClass = 'bg-amber-300';
+    statusBadgeClass = 'border-amber-400/30 bg-amber-500/10 text-amber-200';
+    statusLabel = '连接不稳定';
+  } else if (isConnected) {
+    statusDotClass = 'bg-emerald-400';
+    statusBadgeClass =
+      'border-emerald-400/30 bg-emerald-500/10 text-emerald-300';
+    statusLabel = '在线';
+  } else if (isConnecting) {
+    statusDotClass = 'bg-blue-300';
+    statusBadgeClass = 'border-blue-400/30 bg-blue-500/10 text-blue-200';
+    statusLabel = '连接中';
+  }
+
+  let workspaceContent = (
+    <section className="yogo-panel grid min-h-0 flex-1 place-items-center rounded-3xl p-8 text-center max-sm:p-5">
+      <div className="max-w-md">
+        <h3 className="text-xl font-semibold text-slate-100">设备未连接</h3>
+        <p className="mt-2 text-sm text-slate-500">连接后打开工作台</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            className="yogo-button-danger rounded-xl px-4 py-2.5 text-sm font-medium transition"
+            onClick={() => onDelete(record)}
+          >
+            删除
+          </button>
+          <button
+            type="button"
+            className="yogo-button-primary rounded-xl px-4 py-2.5 text-sm font-semibold transition"
+            onClick={() => onConnect(record)}
+          >
+            连接设备
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+
+  if (pendingConnection) {
+    workspaceContent = (
+      <section className="yogo-panel grid min-h-0 flex-1 place-items-center rounded-3xl p-8 text-center max-sm:p-5">
+        <div className="max-w-md">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-blue-400/20 border-t-blue-300" />
+          <h3 className="mt-5 text-xl font-semibold text-slate-100">
+            正在连接设备
+          </h3>
+          <p className="mt-2 break-all text-sm leading-6 text-slate-500">
+            {record.username}@{record.host}:{record.port}
+          </p>
+          <button
+            type="button"
+            className="yogo-button-secondary mt-6 rounded-xl px-4 py-2.5 text-sm font-medium transition"
+            onClick={() => onCancelConnect(pendingConnection.connectionId)}
+          >
+            取消连接
+          </button>
+        </div>
+      </section>
+    );
+  } else if (connection) {
+    workspaceContent = (
+      <section className="yogo-panel min-h-0 flex-1 overflow-y-auto rounded-3xl p-6 max-sm:p-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 max-sm:grid-cols-1">
+          {workspaceActions.map((action) => (
+            <article
+              key={action.id}
+              className="yogo-card yogo-card-hover flex min-h-42 flex-col justify-between rounded-2xl p-5"
+            >
+              <div>
+                <h3 className="text-base font-semibold text-slate-100">
+                  {action.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  {action.description}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isBusy}
+                className={
+                  action.danger
+                    ? 'yogo-button-danger mt-5 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60'
+                    : 'yogo-button-primary mt-5 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60'
+                }
+                onClick={() => {
+                  if (action.danger) {
+                    onReboot();
+                    return;
+                  }
+                  if (action.route) {
+                    onOpenTool(action.route, action.options);
+                  }
+                }}
+              >
+                {isBusy ? '处理中...' : action.label}
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
@@ -177,21 +294,15 @@ export default function ConnectionWorkspacePanel({
         </div>
         <section className="yogo-panel min-w-0 flex-1 rounded-2xl px-4 py-3">
           <div className="flex min-w-0 items-center justify-between gap-4 max-sm:flex-wrap max-sm:gap-3">
-            <div className="flex min-h-7 min-w-0 flex-1 items-center gap-3 max-sm:w-full max-sm:items-start">
+            <div className="flex min-h-7 min-w-0 flex-1 items-center gap-3 max-sm:w-full">
               <span
-                className={`mt-2 h-2.5 w-2.5 shrink-0 rounded-full ${
-                  isConnected ? 'bg-emerald-400' : 'bg-slate-500'
-                }`}
+                className={`h-2.5 w-2.5 shrink-0 self-center rounded-full ${statusDotClass}`}
               />
               <div className="min-w-0 flex-1 text-sm leading-7 text-slate-300 max-sm:leading-6">
                 <span
-                  className={`mr-3 inline-flex h-6 shrink-0 items-center rounded-full border px-2.5 text-xs font-medium leading-none ${
-                    isConnected
-                      ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
-                      : 'border-slate-600 bg-slate-800/80 text-slate-400'
-                  }`}
+                  className={`mr-3 inline-flex h-6 shrink-0 items-center rounded-full border px-2.5 text-xs font-medium leading-none ${statusBadgeClass}`}
                 >
-                  {isConnected ? '在线' : '离线'}
+                  {statusLabel}
                 </span>
                 <span className="break-all font-semibold text-slate-100">
                   {record.username}@{record.host}:{record.port}
@@ -208,6 +319,17 @@ export default function ConnectionWorkspacePanel({
               </div>
             </div>
             <div className="flex shrink-0 self-center">
+              {pendingConnection && (
+                <button
+                  type="button"
+                  className="yogo-button-secondary h-7 rounded-lg px-2.5 text-xs font-medium leading-none transition"
+                  onClick={() =>
+                    onCancelConnect(pendingConnection.connectionId)
+                  }
+                >
+                  取消连接
+                </button>
+              )}
               {connection && (
                 <button
                   type="button"
@@ -221,70 +343,7 @@ export default function ConnectionWorkspacePanel({
           </div>
         </section>
       </div>
-      {!connection ? (
-        <section className="yogo-panel grid min-h-0 flex-1 place-items-center rounded-3xl p-8 text-center max-sm:p-5">
-          <div className="max-w-md">
-            <h3 className="text-xl font-semibold text-slate-100">设备未连接</h3>
-            <p className="mt-2 text-sm text-slate-500">连接后打开工作台</p>
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                className="yogo-button-danger rounded-xl px-4 py-2.5 text-sm font-medium transition"
-                onClick={() => onDelete(record)}
-              >
-                删除
-              </button>
-              <button
-                type="button"
-                className="yogo-button-primary rounded-xl px-4 py-2.5 text-sm font-semibold transition"
-                onClick={() => onConnect(record)}
-              >
-                连接设备
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section className="yogo-panel min-h-0 flex-1 overflow-y-auto rounded-3xl p-6 max-sm:p-4">
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 max-sm:grid-cols-1">
-            {workspaceActions.map((action) => (
-              <article
-                key={action.id}
-                className="yogo-card yogo-card-hover flex min-h-42 flex-col justify-between rounded-2xl p-5"
-              >
-                <div>
-                  <h3 className="text-base font-semibold text-slate-100">
-                    {action.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    {action.description}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  className={
-                    action.danger
-                      ? 'yogo-button-danger mt-5 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60'
-                      : 'yogo-button-primary mt-5 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60'
-                  }
-                  onClick={() => {
-                    if (action.danger) {
-                      onReboot();
-                      return;
-                    }
-                    if (action.route) {
-                      onOpenTool(action.route, action.options);
-                    }
-                  }}
-                >
-                  {isBusy ? '处理中...' : action.label}
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+      {workspaceContent}
     </section>
   );
 }

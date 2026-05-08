@@ -1,5 +1,5 @@
 import { BrowserWindowConstructorOptions } from 'electron';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useFile,
   useNotification,
@@ -24,7 +24,10 @@ import {
 } from './storage';
 import type {
   ActiveConnection,
+  ActiveConnectionInfo,
+  ConnectionHealthEvent,
   ConnectionFormValues,
+  PendingConnection,
   SshConnectionRecord,
 } from './types';
 import type { ConnectionFormErrors } from './validation';
@@ -54,6 +57,11 @@ export default function SshConnections() {
   const [activeConnections, setActiveConnections] = useState<
     Record<string, ActiveConnection>
   >({});
+  const [pendingConnections, setPendingConnections] = useState<
+    Record<string, PendingConnection>
+  >({});
+  const pendingConnectionsRef = useRef<Record<string, PendingConnection>>({});
+  const canceledAuthConnectionIdsRef = useRef<Set<string>>(new Set());
   const { updateState, showUpdatePrompt, setShowUpdatePrompt } =
     useSidebarUpdatePrompt();
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
@@ -68,16 +76,113 @@ export default function SshConnections() {
   const selectedConnection = selectedRecord
     ? activeConnections[selectedRecord.id] || null
     : null;
-  const { authenticate, disconnect } = useSSH();
+  const selectedPendingConnection = selectedRecord
+    ? pendingConnections[selectedRecord.id] || null
+    : null;
+  const { authenticate, cancelAuthentication, disconnect } = useSSH();
   const { createWindow } = useWindow();
   const { systemReboot } = useSystem();
   const { showOpenDialog } = useFile();
   const { showWarning } = useNotification();
   const { showError, showSuccess, showWarning: showToastWarning } = useToast();
 
+  const updatePendingConnections = useCallback(
+    (
+      updater:
+        | Record<string, PendingConnection>
+        | ((
+            current: Record<string, PendingConnection>,
+          ) => Record<string, PendingConnection>),
+    ) => {
+      setPendingConnections((current) => {
+        const nextConnections =
+          typeof updater === 'function' ? updater(current) : updater;
+        pendingConnectionsRef.current = nextConnections;
+        return nextConnections;
+      });
+    },
+    [],
+  );
+
+  const getConnectionRecordKey = useCallback(
+    (connection: Pick<SshConnectionRecord, 'host' | 'port' | 'username'>) =>
+      `${connection.username.trim().toLowerCase()}@${connection.host.trim().toLowerCase()}:${connection.port.trim()}`,
+    [],
+  );
+
+  const syncActiveConnections = useCallback(
+    (connections: ActiveConnectionInfo[]) => {
+      const activeConnectionIds = new Set(
+        connections.map((connection) => connection.connectionId),
+      );
+      setActiveConnections((current) => {
+        const recordsByKey = new Map(
+          records.map((record) => [getConnectionRecordKey(record), record]),
+        );
+        const nextConnections: Record<string, ActiveConnection> = {};
+
+        connections.forEach((connection) => {
+          const existingConnection = Object.values(current).find(
+            (item) => item.connectionId === connection.connectionId,
+          );
+          const matchingRecord = recordsByKey.get(
+            getConnectionRecordKey(connection.credentials),
+          );
+          const record = existingConnection?.record || matchingRecord;
+          if (!record) return;
+
+          nextConnections[record.id] = {
+            connectionId: connection.connectionId,
+            record,
+            healthStatus: connection.healthStatus || 'online',
+          };
+        });
+
+        setSelectedRecordId((currentSelectedRecordId) => {
+          if (currentSelectedRecordId) return currentSelectedRecordId;
+          return Object.keys(nextConnections)[0] || currentSelectedRecordId;
+        });
+
+        return nextConnections;
+      });
+
+      updatePendingConnections((current) => {
+        const nextPendingConnections = { ...current };
+        Object.entries(current).forEach(([recordId, pendingConnection]) => {
+          if (activeConnectionIds.has(pendingConnection.connectionId)) {
+            delete nextPendingConnections[recordId];
+          }
+        });
+        return nextPendingConnections;
+      });
+    },
+    [getConnectionRecordKey, records, updatePendingConnections],
+  );
+
   useEffect(() => {
     setRecords(loadConnections());
   }, []);
+
+  useEffect(() => {
+    const loadActiveConnections = async () => {
+      const result = await window.electron.ipcRenderer.invoke(
+        'ssh:get-active-connections',
+      );
+      if (result?.success) {
+        syncActiveConnections(result.data as ActiveConnectionInfo[]);
+      }
+    };
+
+    loadActiveConnections();
+    const unsubscribe = window.electron.ipcRenderer.on(
+      'ssh:active-connections-changed',
+      (payload) => {
+        syncActiveConnections(payload as ActiveConnectionInfo[]);
+      },
+    );
+
+    return unsubscribe;
+  }, [syncActiveConnections]);
 
   useEffect(() => {
     const unsubscribe = window.electron.ipcRenderer.on(
@@ -108,6 +213,29 @@ export default function SshConnections() {
 
     return unsubscribe;
   }, [showToastWarning, showWarning]);
+
+  useEffect(() => {
+    const unsubscribe = window.electron.ipcRenderer.on(
+      'ssh:connection-health-changed',
+      (payload) => {
+        const healthEvent = payload as ConnectionHealthEvent;
+        setActiveConnections((current) => {
+          const nextConnections = { ...current };
+          Object.entries(current).forEach(([recordId, connection]) => {
+            if (connection.connectionId === healthEvent.connectionId) {
+              nextConnections[recordId] = {
+                ...connection,
+                healthStatus: healthEvent.status,
+              };
+            }
+          });
+          return nextConnections;
+        });
+      },
+    );
+
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const unsubscribe = window.electron.ipcRenderer.on(
@@ -180,11 +308,51 @@ export default function SshConnections() {
       return;
     }
 
+    const pendingConnectionId = `pending_${record.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     setConnectingId(record.id);
+    setSelectedRecordId(record.id);
+    setShowForm(false);
+    updatePendingConnections((current) => ({
+      ...current,
+      [record.id]: {
+        connectionId: pendingConnectionId,
+        record,
+      },
+    }));
     try {
-      const result = await authenticate(toCredentials(values));
+      const result = await authenticate(
+        toCredentials(values),
+        pendingConnectionId,
+      );
+      if (canceledAuthConnectionIdsRef.current.has(pendingConnectionId)) {
+        canceledAuthConnectionIdsRef.current.delete(pendingConnectionId);
+        if (result.success) {
+          await disconnect(result.data.connectionId);
+        }
+        return;
+      }
+
+      const pendingConnection = pendingConnectionsRef.current[record.id];
+      if (
+        pendingConnection &&
+        pendingConnection.connectionId !== pendingConnectionId
+      ) {
+        if (result.success) {
+          await disconnect(result.data.connectionId);
+        }
+        return;
+      }
+
+      updatePendingConnections((current) => {
+        const nextPendingConnections = { ...current };
+        delete nextPendingConnections[record.id];
+        return nextPendingConnections;
+      });
+
       if (!result.success) {
-        showError(result.error || '连接失败');
+        if (result.error !== '连接已取消') {
+          showError(result.error || '连接失败');
+        }
         return;
       }
       setActiveConnections((current) => ({
@@ -192,6 +360,7 @@ export default function SshConnections() {
         [record.id]: {
           connectionId: result.data.connectionId,
           record,
+          healthStatus: 'online',
         },
       }));
       setSelectedRecordId(record.id);
@@ -203,7 +372,16 @@ export default function SshConnections() {
     } catch (error) {
       showError(error instanceof Error ? error.message : '连接失败');
     } finally {
-      setConnectingId(null);
+      setConnectingId((current) => (current === record.id ? null : current));
+      updatePendingConnections((current) => {
+        const pendingConnection = current[record.id];
+        if (pendingConnection?.connectionId !== pendingConnectionId) {
+          return current;
+        }
+        const nextPendingConnections = { ...current };
+        delete nextPendingConnections[record.id];
+        return nextPendingConnections;
+      });
     }
   };
 
@@ -214,6 +392,10 @@ export default function SshConnections() {
 
   const openConnectionForm = (record: SshConnectionRecord) => {
     setIsSidebarOpen(false);
+    if (pendingConnections[record.id]) {
+      setSelectedRecordId(record.id);
+      return;
+    }
     const activeConnection = activeConnections[record.id];
     if (activeConnection) {
       setSelectedRecordId(record.id);
@@ -226,12 +408,31 @@ export default function SshConnections() {
   };
 
   const saveAndConnect = async () => {
-    const savedRecord = saveCurrentForm();
-    if (!savedRecord) return;
-    await connectWithValues(savedRecord, formValues);
+    const errors = validateConnectionFields(formValues);
+    const validationError = getFirstConnectionError(errors);
+    setFormErrors(errors);
+    if (validationError) {
+      showError(validationError);
+      return;
+    }
+
+    const nextRecord = toRecord(formValues, editingRecord || undefined);
+    const nextRecords = editingRecord
+      ? records.map((record) =>
+          record.id === editingRecord.id ? nextRecord : record,
+        )
+      : [nextRecord, ...records];
+
+    persistRecords(nextRecords);
+    setEditingRecord(null);
+    await connectWithValues(nextRecord, formValues);
   };
 
   const deleteRecord = (record: SshConnectionRecord) => {
+    if (pendingConnections[record.id]) {
+      showError('请先取消连接，再删除配置');
+      return;
+    }
     if (activeConnections[record.id]) {
       showError('请先断开连接，再删除配置');
       return;
@@ -318,6 +519,34 @@ export default function SshConnections() {
     showSuccess('连接已断开');
   };
 
+  const cancelConnecting = async (connectionId: string) => {
+    const pendingRecordId = Object.entries(pendingConnectionsRef.current).find(
+      ([, pendingConnection]) =>
+        pendingConnection.connectionId === connectionId,
+    )?.[0];
+    canceledAuthConnectionIdsRef.current.add(connectionId);
+    const result = await cancelAuthentication(connectionId);
+    if (!result.success) {
+      canceledAuthConnectionIdsRef.current.delete(connectionId);
+      showError(result.error || '取消连接失败');
+      return;
+    }
+
+    updatePendingConnections((current) => {
+      const nextPendingConnections = { ...current };
+      Object.entries(current).forEach(([recordId, pendingConnection]) => {
+        if (pendingConnection.connectionId === connectionId) {
+          delete nextPendingConnections[recordId];
+        }
+      });
+      return nextPendingConnections;
+    });
+    setConnectingId((current) =>
+      pendingRecordId === current ? null : current,
+    );
+    showToastWarning('连接已取消');
+  };
+
   const disconnectConnections = async (
     connections: ActiveConnection[],
   ): Promise<boolean> => {
@@ -336,24 +565,62 @@ export default function SshConnections() {
     return true;
   };
 
+  const cancelPendingConnections = async (): Promise<boolean> => {
+    const pendingConnectionIds = Object.values(
+      pendingConnectionsRef.current,
+    ).map((connection) => connection.connectionId);
+    if (pendingConnectionIds.length === 0) return true;
+
+    pendingConnectionIds.forEach((connectionId) => {
+      canceledAuthConnectionIdsRef.current.add(connectionId);
+    });
+
+    const results = await Promise.all(
+      pendingConnectionIds.map((connectionId) =>
+        cancelAuthentication(connectionId),
+      ),
+    );
+    const failedResult = results.find((result) => !result.success);
+
+    if (failedResult) {
+      pendingConnectionIds.forEach((connectionId) => {
+        canceledAuthConnectionIdsRef.current.delete(connectionId);
+      });
+      showError(failedResult.error || '取消连接失败');
+      return false;
+    }
+
+    updatePendingConnections({});
+    setConnectingId(null);
+    return true;
+  };
+
   const disconnectAllConnections = async () => {
+    const canceled = await cancelPendingConnections();
+    if (!canceled) return;
+
     const connections = Object.values(activeConnections);
     const success = await disconnectConnections(connections);
     if (!success) return;
 
     setActiveConnections({});
+    updatePendingConnections({});
     setWorkspaceBusyConnections({});
     setSelectedRecordId(null);
     showSuccess('全部连接已断开');
   };
 
   const clearAllConnections = async () => {
+    const canceled = await cancelPendingConnections();
+    if (!canceled) return;
+
     const connections = Object.values(activeConnections);
     const success = await disconnectConnections(connections);
     if (!success) return;
 
     persistRecords([]);
     setActiveConnections({});
+    updatePendingConnections({});
     setWorkspaceBusyConnections({});
     setSelectedRecordId(null);
     setEditingRecord(null);
@@ -427,6 +694,7 @@ export default function SshConnections() {
         <ConnectionWorkspacePanel
           record={selectedRecord}
           connection={selectedConnection}
+          pendingConnection={selectedPendingConnection}
           isBusy={Boolean(
             selectedConnection &&
             workspaceBusyConnections[selectedConnection.connectionId],
@@ -437,6 +705,7 @@ export default function SshConnections() {
           onReboot={rebootWorkspaceConnection}
           onCreate={openCreateForm}
           onConnect={openConnectionForm}
+          onCancelConnect={cancelConnecting}
           onDelete={deleteRecord}
           onDisconnect={disconnectRecord}
         />

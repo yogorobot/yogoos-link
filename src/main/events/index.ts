@@ -205,8 +205,8 @@ class IPCEventsV2 {
   static registerSSHEvents() {
     ipcMain.handle(
       'ssh:authenticate',
-      async (event, credentials: SSHCredentials) => {
-        return sshManager.authenticateSSH(credentials);
+      async (event, credentials: SSHCredentials, connectionId?: string) => {
+        return sshManager.authenticateSSH(credentials, connectionId);
       },
     );
 
@@ -215,9 +215,33 @@ class IPCEventsV2 {
       sshManager.removeConnection(connectionId);
       return { success: true, data: null };
     });
+
+    ipcMain.handle(
+      'ssh:cancel-authentication',
+      (event, connectionId: string) => {
+        return sshManager.cancelAuthentication(connectionId);
+      },
+    );
+
+    ipcMain.handle('ssh:get-active-connections', () => ({
+      success: true,
+      data: sshManager.getActiveConnections(),
+    }));
   }
 
   static registerSSHConnectionLifecycle() {
+    sshManager.onActiveConnectionsChanged((connections) => {
+      windowManager
+        .getConnectionsWindow()
+        ?.webContents.send('ssh:active-connections-changed', connections);
+    });
+
+    sshManager.onConnectionHealthChanged((event) => {
+      windowManager
+        .getConnectionsWindow()
+        ?.webContents.send('ssh:connection-health-changed', event);
+    });
+
     sshManager.onConnectionClosed((event) => {
       windowManager.closeChildWindows(event.connectionId);
       windowManager

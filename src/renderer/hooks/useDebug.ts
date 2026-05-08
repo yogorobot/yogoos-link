@@ -1,15 +1,17 @@
+import { useCallback } from 'react';
+
 export const useDebug = () => {
-  const debugConnect = (formValues) => {
+  const debugConnect = useCallback((formValues) => {
     return window.electron.ipcRenderer.invoke('debug:connect', formValues);
-  };
+  }, []);
 
-  const debugDisconnect = (formValues) => {
+  const debugDisconnect = useCallback((formValues?) => {
     return window.electron.ipcRenderer.invoke('debug:disconnect', formValues);
-  };
+  }, []);
 
-  const getDebugTargets = () => {
+  const getDebugTargets = useCallback(() => {
     return window.electron.ipcRenderer.invoke('debug:get-targets');
-  };
+  }, []);
 
   return {
     debugConnect,

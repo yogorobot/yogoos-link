@@ -26,10 +26,25 @@ export type PublicSSHCredentials = Omit<
   'password' | 'jumpPassword'
 >;
 
+export type ConnectionHealthStatus = 'online' | 'unstable';
+
 export interface ActiveSSHConnectionInfo {
   connectionId: string;
   credentials: PublicSSHCredentials;
+  healthStatus: ConnectionHealthStatus;
 }
+
+type ActiveSSHConnectionsListener = (
+  connections: ActiveSSHConnectionInfo[],
+) => void;
+
+export interface SSHConnectionHealthEvent {
+  connectionId: string;
+  status: ConnectionHealthStatus;
+  failureCount: number;
+}
+
+type SSHConnectionHealthListener = (event: SSHConnectionHealthEvent) => void;
 
 export interface TunnelOptions {
   localHost?: string;
@@ -54,6 +69,17 @@ interface SSHConnectionContext {
   tunnelConnections: Map<string, Set<net.Socket>>;
   tunnelCounter: number;
   isDisconnecting: boolean;
+  healthFailureCount: number;
+  healthStatus: ConnectionHealthStatus;
+  healthTimer: ReturnType<typeof setInterval> | null;
+  healthCheckInFlight: boolean;
+  healthCheckToken: number;
+}
+
+interface PendingSSHConnectionContext {
+  clients: Set<SSH2Client>;
+  isCanceled: boolean;
+  resolve?: (value: Response<{ connectionId: string }>) => void;
 }
 
 export interface SSHConnectionClosedEvent {
@@ -69,11 +95,21 @@ type SSHConnectionClosedListener = (event: SSHConnectionClosedEvent) => void;
 const SSH_CONNECT_TIMEOUT = 10000;
 const SSH_KEEPALIVE_INTERVAL = 3000;
 const SSH_KEEPALIVE_COUNT_MAX = 10;
+const HEALTH_CHECK_INTERVAL = 3000;
+const HEALTH_CHECK_TIMEOUT = 10000;
+const UNSTABLE_FAILURE_COUNT = 3;
 
 export class SSHAuthManager {
   private connections: Map<string, SSHConnectionContext> = new Map();
 
+  private pendingConnections: Map<string, PendingSSHConnectionContext> =
+    new Map();
+
   private connectionClosedListeners = new Set<SSHConnectionClosedListener>();
+
+  private activeConnectionsListeners = new Set<ActiveSSHConnectionsListener>();
+
+  private connectionHealthListeners = new Set<SSHConnectionHealthListener>();
 
   private static attachPasswordAuthHandler(
     connection: SSH2Client,
@@ -87,6 +123,13 @@ export class SSHAuthManager {
     );
   }
 
+  private static safelyEndClient(client: SSH2Client): void {
+    client.on('error', (error) => {
+      log.warn('关闭 SSH 客户端时忽略连接错误:', error);
+    });
+    client.end();
+  }
+
   public async authenticateSSH(
     credentials: SSHCredentials,
     connectionId?: string,
@@ -95,14 +138,59 @@ export class SSHAuthManager {
     if (this.connections.has(id)) {
       this.removeConnection(id);
     }
+    const pendingContext: PendingSSHConnectionContext = {
+      clients: new Set(),
+      isCanceled: false,
+    };
+    this.pendingConnections.set(id, pendingContext);
 
     return new Promise((resolve) => {
+      const resolveConnection = (value: Response<{ connectionId: string }>) => {
+        this.pendingConnections.delete(id);
+        resolve(value);
+      };
+      pendingContext.resolve = resolveConnection;
       if (credentials.useJumpHost) {
-        this.connectThroughJumpHost(id, credentials, resolve);
+        this.connectThroughJumpHost(id, credentials, resolveConnection);
       } else {
-        this.connectDirectly(id, credentials, resolve);
+        this.connectDirectly(id, credentials, resolveConnection);
       }
     });
+  }
+
+  public cancelAuthentication(connectionId: string): Response<null> {
+    const pendingContext = this.pendingConnections.get(connectionId);
+    if (!pendingContext) {
+      this.removeConnection(connectionId);
+      return new SuccessResponse(null);
+    }
+
+    pendingContext.isCanceled = true;
+    pendingContext.clients.forEach((client) => {
+      SSHAuthManager.safelyEndClient(client);
+    });
+    pendingContext.resolve?.(new ErrorResponse('连接已取消'));
+    this.pendingConnections.delete(connectionId);
+    return new SuccessResponse(null);
+  }
+
+  private trackPendingClient(
+    connectionId: string,
+    client: SSH2Client,
+  ): boolean {
+    const pendingContext = this.pendingConnections.get(connectionId);
+    if (!pendingContext || pendingContext.isCanceled) {
+      SSHAuthManager.safelyEndClient(client);
+      return false;
+    }
+
+    pendingContext.clients.add(client);
+    return true;
+  }
+
+  private isAuthenticationCanceled(connectionId: string): boolean {
+    const pendingContext = this.pendingConnections.get(connectionId);
+    return !pendingContext || pendingContext.isCanceled;
   }
 
   private static createConnectionId(credentials: SSHCredentials): string {
@@ -120,9 +208,15 @@ export class SSHAuthManager {
     );
     const jumpConn = new Client();
     const targetConn = new Client();
+    if (!this.trackPendingClient(connectionId, jumpConn)) return;
+    if (!this.trackPendingClient(connectionId, targetConn)) return;
     SSHAuthManager.attachPasswordAuthHandler(targetConn, credentials.password);
 
     jumpConn.on('ready', () => {
+      if (this.isAuthenticationCanceled(connectionId)) {
+        jumpConn.end();
+        return;
+      }
       log.info(`Jump host connected: ${credentials.jumpHost}`);
       jumpConn.forwardOut(
         '127.0.0.1',
@@ -130,6 +224,11 @@ export class SSHAuthManager {
         credentials.host,
         parseInt(credentials.port, 10),
         (err, stream) => {
+          if (this.isAuthenticationCanceled(connectionId)) {
+            stream?.destroy();
+            jumpConn.end();
+            return;
+          }
           if (err) {
             jumpConn.end();
             resolve(
@@ -139,6 +238,11 @@ export class SSHAuthManager {
           }
 
           targetConn.on('ready', () => {
+            if (this.isAuthenticationCanceled(connectionId)) {
+              targetConn.end();
+              jumpConn.end();
+              return;
+            }
             log.info(`Target host connected successfully: ${connectionId}`);
             this.registerConnection(connectionId, targetConn, credentials);
             targetConn.on('close', () => jumpConn.end());
@@ -207,8 +311,13 @@ export class SSHAuthManager {
     resolve: (value: Response<{ connectionId: string }>) => void,
   ): void {
     const conn = new Client();
+    if (!this.trackPendingClient(connectionId, conn)) return;
     SSHAuthManager.attachPasswordAuthHandler(conn, credentials.password);
     conn.on('ready', () => {
+      if (this.isAuthenticationCanceled(connectionId)) {
+        conn.end();
+        return;
+      }
       log.info(`SSH connection successful: ${connectionId}`);
       this.registerConnection(connectionId, conn, credentials);
       resolve(new SuccessResponse({ connectionId }));
@@ -244,17 +353,76 @@ export class SSHAuthManager {
       tunnelConnections: new Map(),
       tunnelCounter: 0,
       isDisconnecting: false,
+      healthFailureCount: 0,
+      healthStatus: 'online',
+      healthTimer: null,
+      healthCheckInFlight: false,
+      healthCheckToken: 0,
     };
 
     this.connections.set(connectionId, context);
+    this.startHealthCheck(context);
+    this.logActiveConnections('register');
+    this.notifyActiveConnectionsChanged();
     connection.on('error', (err) => this.handleSSHError(connectionId, err));
     connection.on('close', () => this.handleConnectionClose(connectionId));
     connection.on('end', () => this.handleConnectionClose(connectionId));
   }
 
+  private logActiveConnections(reason: string): void {
+    const activeConnections = Array.from(this.connections.entries()).map(
+      ([connectionId, context]) => {
+        const { host, port, username, useJumpHost, jumpHost, jumpPort } =
+          context.credentials;
+        return {
+          connectionId,
+          target: `${username}@${host}:${port}`,
+          jumpHost: useJumpHost ? `${jumpHost}:${jumpPort || '22'}` : null,
+        };
+      },
+    );
+
+    log.info('Active SSH connections:', {
+      reason,
+      count: activeConnections.length,
+      connections: activeConnections,
+    });
+  }
+
   public onConnectionClosed(listener: SSHConnectionClosedListener): () => void {
     this.connectionClosedListeners.add(listener);
     return () => this.connectionClosedListeners.delete(listener);
+  }
+
+  public onActiveConnectionsChanged(
+    listener: ActiveSSHConnectionsListener,
+  ): () => void {
+    this.activeConnectionsListeners.add(listener);
+    return () => this.activeConnectionsListeners.delete(listener);
+  }
+
+  public onConnectionHealthChanged(
+    listener: SSHConnectionHealthListener,
+  ): () => void {
+    this.connectionHealthListeners.add(listener);
+    return () => this.connectionHealthListeners.delete(listener);
+  }
+
+  private notifyActiveConnectionsChanged(): void {
+    const activeConnections = this.getActiveConnections();
+    this.activeConnectionsListeners.forEach((listener) => {
+      listener(activeConnections);
+    });
+  }
+
+  private notifyConnectionHealthChanged(context: SSHConnectionContext): void {
+    const event = {
+      connectionId: context.id,
+      status: context.healthStatus,
+      failureCount: context.healthFailureCount,
+    };
+    this.connectionHealthListeners.forEach((listener) => listener(event));
+    this.notifyActiveConnectionsChanged();
   }
 
   private handleSSHError(connectionId: string, err: Error) {
@@ -278,6 +446,119 @@ export class SSHAuthManager {
     const { host, port, username } = context.credentials;
     const event = { connectionId, host, port, username, reason };
     this.connectionClosedListeners.forEach((listener) => listener(event));
+  }
+
+  private startHealthCheck(context: SSHConnectionContext): void {
+    context.healthTimer = setInterval(() => {
+      this.checkConnectionHealth(context.id);
+    }, HEALTH_CHECK_INTERVAL);
+  }
+
+  private checkConnectionHealth(connectionId: string): void {
+    const context = this.connections.get(connectionId);
+    if (!context || context.isDisconnecting || context.healthCheckInFlight) {
+      return;
+    }
+
+    context.healthCheckInFlight = true;
+    context.healthCheckToken += 1;
+    const { healthCheckToken } = context;
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      this.handleHealthFailure(
+        connectionId,
+        healthCheckToken,
+        new Error('健康检测超时'),
+      );
+    }, HEALTH_CHECK_TIMEOUT);
+
+    context.connection.exec('true', (err, stream) => {
+      if (err) {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          this.handleHealthFailure(connectionId, healthCheckToken, err);
+        }
+        return;
+      }
+
+      stream
+        .on('close', (code) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          if (code === 0) {
+            this.handleHealthSuccess(connectionId, healthCheckToken);
+            return;
+          }
+          this.handleHealthFailure(
+            connectionId,
+            healthCheckToken,
+            new Error(`健康检测命令退出码: ${code}`),
+          );
+        })
+        .on('error', (streamError) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          this.handleHealthFailure(connectionId, healthCheckToken, streamError);
+        });
+    });
+  }
+
+  private handleHealthSuccess(
+    connectionId: string,
+    healthCheckToken: number,
+  ): void {
+    const context = this.connections.get(connectionId);
+    if (
+      !context ||
+      context.isDisconnecting ||
+      context.healthCheckToken !== healthCheckToken
+    ) {
+      return;
+    }
+
+    const shouldNotify = context.healthStatus !== 'online';
+    context.healthCheckInFlight = false;
+    context.healthFailureCount = 0;
+    context.healthStatus = 'online';
+    if (shouldNotify) {
+      this.notifyConnectionHealthChanged(context);
+    }
+  }
+
+  private handleHealthFailure(
+    connectionId: string,
+    healthCheckToken: number,
+    error: Error,
+  ): void {
+    const context = this.connections.get(connectionId);
+    if (
+      !context ||
+      context.isDisconnecting ||
+      context.healthCheckToken !== healthCheckToken
+    ) {
+      return;
+    }
+
+    context.healthCheckInFlight = false;
+    context.healthFailureCount += 1;
+    log.warn('连接健康检测失败:', {
+      connectionId,
+      failureCount: context.healthFailureCount,
+      error: error.message,
+    });
+
+    if (
+      context.healthFailureCount >= UNSTABLE_FAILURE_COUNT &&
+      context.healthStatus !== 'unstable'
+    ) {
+      context.healthStatus = 'unstable';
+      this.notifyConnectionHealthChanged(context);
+    }
   }
 
   private requireContext(connectionId: string): SSHConnectionContext {
@@ -324,9 +605,14 @@ export class SSHAuthManager {
   public getActiveConnections(): ActiveSSHConnectionInfo[] {
     return Array.from(this.connections.keys())
       .map((connectionId) => {
+        const context = this.connections.get(connectionId);
         const credentials = this.getPublicCredentials(connectionId);
-        if (!credentials) return null;
-        return { connectionId, credentials };
+        if (!context || !credentials) return null;
+        return {
+          connectionId,
+          credentials,
+          healthStatus: context.healthStatus,
+        };
       })
       .filter(Boolean) as ActiveSSHConnectionInfo[];
   }
@@ -342,11 +628,17 @@ export class SSHAuthManager {
     }
 
     context.isDisconnecting = true;
+    if (context.healthTimer) {
+      clearInterval(context.healthTimer);
+      context.healthTimer = null;
+    }
     this.closeAllTunnels(connectionId);
     context.connection.removeAllListeners();
     context.connection.end();
     this.connections.delete(connectionId);
     log.info(`SSH resources cleaned up: ${connectionId}`);
+    this.logActiveConnections('remove');
+    this.notifyActiveConnectionsChanged();
   }
 
   public removeAllConnections(): void {

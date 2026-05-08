@@ -229,56 +229,59 @@ const Index = () => {
     });
   }, [activeTargetId]);
 
-  const connectDebug = async (enableDebug = false) => {
-    setIsExecuting(true);
-    try {
-      setRequiresRemoteDebugConfig(false);
-      const result = await debugConnect({
-        'remote-port': '8315',
-        'enable-debug': enableDebug,
-      });
-      if (result.success) {
-        const nextTargets = result.data.targets;
-        const firstTarget = nextTargets[0];
-        const firstTargetId = firstTarget ? getTargetId(firstTarget) : null;
-        debugLog('connect:targets', {
-          localPort: result.data.localPort,
-          remotePort: result.data.remotePort,
-          targets: nextTargets.map((target) => ({
-            id: target.id,
-            title: target.title,
-            url: target.url,
-            devtoolsFrontendUrl: target.devtoolsFrontendUrl,
-            devToolsUrl: target.devToolsUrl,
-          })),
+  const connectDebug = useCallback(
+    async (enableDebug = false) => {
+      setIsExecuting(true);
+      try {
+        setRequiresRemoteDebugConfig(false);
+        const result = await debugConnect({
+          'remote-port': '8315',
+          'enable-debug': enableDebug,
         });
-        setTargets(nextTargets);
-        setActiveTargetId(firstTargetId);
-        if (firstTargetId) {
-          setVisitedTargetIds([firstTargetId]);
-          setLoadingTargets({ [firstTargetId]: true });
+        if (result.success) {
+          const nextTargets = result.data.targets;
+          const firstTarget = nextTargets[0];
+          const firstTargetId = firstTarget ? getTargetId(firstTarget) : null;
+          debugLog('connect:targets', {
+            localPort: result.data.localPort,
+            remotePort: result.data.remotePort,
+            targets: nextTargets.map((target) => ({
+              id: target.id,
+              title: target.title,
+              url: target.url,
+              devtoolsFrontendUrl: target.devtoolsFrontendUrl,
+              devToolsUrl: target.devToolsUrl,
+            })),
+          });
+          setTargets(nextTargets);
+          setActiveTargetId(firstTargetId);
+          if (firstTargetId) {
+            setVisitedTargetIds([firstTargetId]);
+            setLoadingTargets({ [firstTargetId]: true });
+          }
+          setAssignedLocalPort(result.data.localPort);
+          showSuccess('调试连接成功');
+          return;
         }
-        setAssignedLocalPort(result.data.localPort);
-        showSuccess('调试连接成功');
-        return;
-      }
 
-      if (result.error === 'REMOTE_DEBUG_NOT_CONFIGURED') {
-        setRequiresRemoteDebugConfig(true);
-        return;
-      }
+        if (result.error === 'REMOTE_DEBUG_NOT_CONFIGURED') {
+          setRequiresRemoteDebugConfig(true);
+          return;
+        }
 
-      const errorMsg = result.error || '调试连接失败';
-      showError(`调试连接失败: ${errorMsg}`);
-      await closeDebugWindow(errorMsg);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : '未知错误';
-      showError(`调试连接失败: ${errorMsg}`);
-      await closeDebugWindow(errorMsg);
-    } finally {
-      setIsExecuting(false);
-    }
-  };
+        const errorMsg = result.error || '调试连接失败';
+        showError(`调试连接失败: ${errorMsg}`);
+        await closeDebugWindow(errorMsg);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : '未知错误';
+        showError(`调试连接失败: ${errorMsg}`);
+        await closeDebugWindow(errorMsg);
+      } finally {
+        setIsExecuting(false);
+      }
+    },
+    [closeDebugWindow, debugConnect, showError, showSuccess],
+  );
 
   const enableRemoteDebugging = () => {
     connectDebug(true);
@@ -289,8 +292,7 @@ const Index = () => {
     hasStartedRef.current = true;
     connectDebug();
     // 首次进入页面即建立调试通道，避免用户再点一次连接。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [connectDebug]);
 
   useEffect(() => {
     if (!assignedLocalPort) return undefined;
@@ -364,7 +366,7 @@ const Index = () => {
       isMounted = false;
       window.clearInterval(timer);
     };
-  }, [assignedLocalPort]);
+  }, [assignedLocalPort, closeDebugWindow, getDebugTargets, showError]);
 
   const selectTarget = (target: DebugTarget) => {
     const targetId = getTargetId(target);
@@ -514,8 +516,7 @@ const Index = () => {
                     未开启远程调试
                   </h2>
                   <p className="mt-3 text-sm leading-6 text-slate-400">
-                    目标主机未配置 8315
-                    调试端口。启用后会重启远程服务，稍后自动重新连接。
+                    目标主机未配置调试端口。启用后会重启远程服务，稍后自动重新连接。
                   </p>
                   <div className="mt-6 flex justify-center gap-3">
                     <button

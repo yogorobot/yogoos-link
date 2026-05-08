@@ -35,7 +35,11 @@ type LogChannels =
 // 其余代码保持不变
 type SSHChannels =
   | 'ssh:authenticate'
+  | 'ssh:cancel-authentication'
+  | 'ssh:get-active-connections'
   | 'ssh:disconnect-by-id'
+  | 'ssh:active-connections-changed'
+  | 'ssh:connection-health-changed'
   | 'ssh:connection-closed'
   | 'ssh:select-connection';
 

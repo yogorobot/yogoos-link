@@ -12,6 +12,8 @@ export interface SSHCredentials {
   jumpKeyFilePath?: string;
 }
 
+export type ConnectionHealthStatus = 'online' | 'unstable';
+
 export interface SshConnectionRecord {
   id: string;
   name: string;
@@ -37,6 +39,24 @@ export type ConnectionFormValues = Omit<
 };
 
 export interface ActiveConnection {
+  connectionId: string;
+  record: SshConnectionRecord;
+  healthStatus: ConnectionHealthStatus;
+}
+
+export interface ActiveConnectionInfo {
+  connectionId: string;
+  credentials: Omit<SSHCredentials, 'password' | 'jumpPassword'>;
+  healthStatus: ConnectionHealthStatus;
+}
+
+export interface ConnectionHealthEvent {
+  connectionId: string;
+  status: ConnectionHealthStatus;
+  failureCount: number;
+}
+
+export interface PendingConnection {
   connectionId: string;
   record: SshConnectionRecord;
 }
