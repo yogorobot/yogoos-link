@@ -8,7 +8,6 @@ import AppSwitch from './pages/AppSwitch';
 import PackageManager from './pages/PackageManager';
 import StorageViewer from './pages/StorageViewer';
 import { NotificationProvider } from './components/NotificationProvider';
-import AppUpdatePrompt from './components/AppUpdatePrompt';
 import './tailwind.css';
 
 function AppContent() {
@@ -32,7 +31,6 @@ function AppContent() {
           <Route path="/storage-viewer" element={<StorageViewer />} />
         </Routes>
       </div>
-      <AppUpdatePrompt />
     </div>
   );
 }

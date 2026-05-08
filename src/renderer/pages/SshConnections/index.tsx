@@ -7,9 +7,11 @@ import {
   useSystem,
   useWindow,
 } from '../../hooks';
+import AppUpdatePrompt from '../../components/AppUpdatePrompt';
 import { useToast } from '../../components/NotificationProvider';
 import WindowTitlebar from '../../components/WindowTitlebar';
 import ConnectionSidebar from './components/ConnectionSidebar';
+import ConnectionSidebarLogo from './components/ConnectionSidebarLogo';
 import ConnectionWorkspacePanel from './components/ConnectionWorkspacePanel';
 import SshConnectionForm from './components/SshConnectionForm';
 import {
@@ -31,6 +33,7 @@ import {
   toCredentials,
   validateConnectionFields,
 } from './validation';
+import useSidebarUpdatePrompt from './hooks/useSidebarUpdatePrompt';
 
 export default function SshConnections() {
   const [records, setRecords] = useState<SshConnectionRecord[]>([]);
@@ -51,6 +54,8 @@ export default function SshConnections() {
   const [activeConnections, setActiveConnections] = useState<
     Record<string, ActiveConnection>
   >({});
+  const { updateState, showUpdatePrompt, setShowUpdatePrompt } =
+    useSidebarUpdatePrompt();
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
   const filteredRecords = normalizedSearchTerm
     ? records.filter((record) =>
@@ -391,12 +396,17 @@ export default function SshConnections() {
           />
         )}
         <div
-          className={`z-40 flex min-h-0 shrink-0 transition-transform duration-200 max-[860px]:fixed max-[860px]:bottom-3 max-[860px]:left-3 max-[860px]:top-[calc(var(--yogo-titlebar-safe-height)+0.75rem)] max-[860px]:w-[min(22rem,calc(100vw-1.5rem))] ${
+          className={`z-40 flex min-h-0 shrink-0 flex-col gap-3 transition-transform duration-200 max-[860px]:fixed max-[860px]:bottom-3 max-[860px]:left-3 max-[860px]:top-[calc(var(--yogo-titlebar-safe-height)+0.75rem)] max-[860px]:w-[min(22rem,calc(100vw-1.5rem))] ${
             isSidebarOpen
               ? 'max-[860px]:translate-x-0'
               : 'max-[860px]:-translate-x-[calc(100%+1rem)]'
           }`}
         >
+          <ConnectionSidebarLogo
+            hasUpdate={updateState?.status === 'available'}
+            updateVersion={updateState?.availableVersion}
+            onOpenUpdate={() => setShowUpdatePrompt(true)}
+          />
           <ConnectionSidebar
             records={filteredRecords}
             recordCount={records.length}
@@ -456,6 +466,12 @@ export default function SshConnections() {
           </div>
         </div>
       )}
+
+      <AppUpdatePrompt
+        open={showUpdatePrompt}
+        state={updateState}
+        onOpenChange={setShowUpdatePrompt}
+      />
     </main>
   );
 }

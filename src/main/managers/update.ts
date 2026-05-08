@@ -83,7 +83,29 @@ class UpdateManager {
       return new SuccessResponse(this.state);
     } catch (error) {
       const message = UpdateManager.normalizeUpdateError(error);
-      this.setState({ status: 'error', error: message });
+      if (!manual) {
+        log.warn(`自动更新检查失败：${message}`);
+        this.setState({
+          status: 'not-available',
+          availableVersion: undefined,
+          releaseName: undefined,
+          releaseNotes: undefined,
+          releaseUrl: undefined,
+          error: undefined,
+          hasRequiredAssets: false,
+        });
+        return new SuccessResponse(this.state);
+      }
+
+      this.setState({
+        status: 'error',
+        availableVersion: undefined,
+        releaseName: undefined,
+        releaseNotes: undefined,
+        releaseUrl: undefined,
+        error: message,
+        hasRequiredAssets: false,
+      });
       return new ErrorResponse(message);
     }
   }

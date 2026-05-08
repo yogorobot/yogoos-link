@@ -4,20 +4,31 @@ import { useToast } from './NotificationProvider';
 import type { AppUpdateState } from '../hooks/useAutoUpdate';
 
 const shouldShowPrompt = (state: AppUpdateState | null) => {
-  return Boolean(state && ['available', 'error'].includes(state.status));
+  return Boolean(state && state.status === 'available');
 };
 
-export default function AppUpdatePrompt() {
-  const [updateState, setUpdateState] = useState<AppUpdateState | null>(null);
-  const [isHidden, setIsHidden] = useState(false);
+interface AppUpdatePromptProps {
+  open: boolean;
+  state?: AppUpdateState | null;
+  onOpenChange: (open: boolean) => void;
+}
+
+export default function AppUpdatePrompt({
+  open,
+  state,
+  onOpenChange,
+}: AppUpdatePromptProps) {
+  const [internalUpdateState, setInternalUpdateState] =
+    useState<AppUpdateState | null>(null);
   const { getUpdateState, openDownloadPage } = useAutoUpdate();
   const { showError } = useToast();
+  const updateState = state || internalUpdateState;
 
   useEffect(() => {
     getUpdateState()
       .then((result) => {
         if (result?.success) {
-          setUpdateState(result.data);
+          setInternalUpdateState(result.data);
         }
         return null;
       })
@@ -27,20 +38,19 @@ export default function AppUpdatePrompt() {
       'update:event',
       (payload) => {
         const nextState = payload as AppUpdateState;
-        setUpdateState(nextState);
-        if (nextState.status === 'available') {
-          setIsHidden(false);
+        setInternalUpdateState(nextState);
+        if (nextState.status !== 'available') {
+          onOpenChange(false);
         }
       },
     );
 
     return unsubscribe;
-  }, [getUpdateState]);
+  }, [getUpdateState, onOpenChange]);
 
-  if (!shouldShowPrompt(updateState) || isHidden) return null;
+  if (!open || !shouldShowPrompt(updateState)) return null;
 
   const availableVersion = updateState?.availableVersion || '新版本';
-  const isError = updateState?.status === 'error';
 
   const handleOpenDownloadPage = async () => {
     const result = await openDownloadPage();
@@ -68,11 +78,9 @@ export default function AppUpdatePrompt() {
             当前版本 {updateState?.currentVersion}，
             {updateState?.isTestingChannel ? '测试通道' : '正式通道'}。
           </p>
-          {!isError && (
-            <p className="rounded-2xl border border-blue-400/20 bg-blue-500/10 p-3 text-blue-100">
-              当前版本需要手动下载安装，点击下方按钮前往 Release 下载页面。
-            </p>
-          )}
+          <p className="rounded-2xl border border-blue-400/20 bg-blue-500/10 p-3 text-blue-100">
+            当前版本需要手动下载安装，点击下方按钮前往 Release 下载页面。
+          </p>
           {updateState?.releaseUrl && (
             <p className="break-all rounded-2xl border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-500">
               {updateState.releaseUrl}
@@ -83,30 +91,23 @@ export default function AppUpdatePrompt() {
               {updateState.releaseNotes}
             </div>
           )}
-          {isError && (
-            <p className="max-h-40 overflow-y-auto break-words rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-red-200">
-              {updateState?.error || '更新失败'}
-            </p>
-          )}
         </div>
 
         <div className="mt-6 flex items-center justify-end gap-2 max-sm:flex-col-reverse max-sm:items-stretch">
           <button
             type="button"
             className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-slate-800/70 hover:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-600/60"
-            onClick={() => setIsHidden(true)}
+            onClick={() => onOpenChange(false)}
           >
             稍后
           </button>
-          {!isError && (
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/60 disabled:cursor-not-allowed disabled:bg-blue-500/60 disabled:shadow-none"
-              onClick={handleOpenDownloadPage}
-            >
-              前往下载
-            </button>
-          )}
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/60 disabled:cursor-not-allowed disabled:bg-blue-500/60 disabled:shadow-none"
+            onClick={handleOpenDownloadPage}
+          >
+            前往下载
+          </button>
         </div>
       </section>
     </div>

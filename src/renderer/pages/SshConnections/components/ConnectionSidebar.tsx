@@ -49,7 +49,7 @@ export default function ConnectionSidebar({
   const hasActiveConnections = activeConnectionCount > 0;
 
   return (
-    <aside className="yogo-panel flex min-h-0 w-86 shrink-0 flex-col rounded-3xl max-[860px]:w-full">
+    <aside className="yogo-panel flex min-h-0 w-86 flex-1 shrink-0 flex-col rounded-3xl max-[860px]:w-full">
       <header className="border-b border-slate-700/70 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-slate-100">设备</h2>
@@ -57,6 +57,7 @@ export default function ConnectionSidebar({
             {records.length} 个历史配置
           </span>
         </div>
+
         <div className="flex items-center gap-2">
           <input
             className="yogo-input min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
