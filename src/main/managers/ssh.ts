@@ -96,7 +96,7 @@ const SSH_CONNECT_TIMEOUT = 10000;
 const SSH_KEEPALIVE_INTERVAL = 3000;
 const SSH_KEEPALIVE_COUNT_MAX = 10;
 const HEALTH_CHECK_INTERVAL = 3000;
-const HEALTH_CHECK_TIMEOUT = 10000;
+const HEALTH_CHECK_TIMEOUT = 20000;
 const UNSTABLE_FAILURE_COUNT = 3;
 
 export class SSHAuthManager {
@@ -526,6 +526,7 @@ export class SSHAuthManager {
     context.healthFailureCount = 0;
     context.healthStatus = 'online';
     if (shouldNotify) {
+      log.info('连接健康检测恢复正常:', { connectionId });
       this.notifyConnectionHealthChanged(context);
     }
   }
@@ -546,17 +547,17 @@ export class SSHAuthManager {
 
     context.healthCheckInFlight = false;
     context.healthFailureCount += 1;
-    log.warn('连接健康检测失败:', {
-      connectionId,
-      failureCount: context.healthFailureCount,
-      error: error.message,
-    });
 
     if (
       context.healthFailureCount >= UNSTABLE_FAILURE_COUNT &&
       context.healthStatus !== 'unstable'
     ) {
       context.healthStatus = 'unstable';
+      log.warn('连接健康检测进入不稳定状态:', {
+        connectionId,
+        failureCount: context.healthFailureCount,
+        error: error.message,
+      });
       this.notifyConnectionHealthChanged(context);
     }
   }
