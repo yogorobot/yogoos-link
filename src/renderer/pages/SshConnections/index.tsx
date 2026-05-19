@@ -160,8 +160,25 @@ export default function SshConnections() {
   );
 
   useEffect(() => {
-    setRecords(loadConnections());
-  }, []);
+    let isMounted = true;
+
+    const loadSavedConnections = async () => {
+      try {
+        const loadedRecords = await loadConnections();
+        if (isMounted) {
+          setRecords(loadedRecords);
+        }
+      } catch (error) {
+        showError(error instanceof Error ? error.message : '读取连接历史失败');
+      }
+    };
+
+    loadSavedConnections();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showError]);
 
   useEffect(() => {
     const loadActiveConnections = async () => {
@@ -259,7 +276,9 @@ export default function SshConnections() {
   const persistRecords = (nextRecords: SshConnectionRecord[]) => {
     const uniqueRecords = dedupeConnections(nextRecords);
     setRecords(uniqueRecords);
-    saveConnections(uniqueRecords);
+    saveConnections(uniqueRecords).catch((error) => {
+      showError(error instanceof Error ? error.message : '保存连接历史失败');
+    });
   };
 
   const openCreateForm = () => {

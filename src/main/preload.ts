@@ -37,6 +37,8 @@ type SSHChannels =
   | 'ssh:authenticate'
   | 'ssh:cancel-authentication'
   | 'ssh:get-active-connections'
+  | 'ssh:load-connection-records'
+  | 'ssh:save-connection-records'
   | 'ssh:disconnect-by-id'
   | 'ssh:active-connections-changed'
   | 'ssh:connection-health-changed'

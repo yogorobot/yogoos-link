@@ -1,7 +1,5 @@
 import type { ConnectionFormValues, SshConnectionRecord } from './types';
 
-const CONNECTIONS_KEY = 'yolink:ssh-connections';
-
 const getConnectionKey = (record: SshConnectionRecord) =>
   record.host.trim().toLowerCase();
 
@@ -48,17 +46,25 @@ export const createDefaultFormValues = (): ConnectionFormValues => ({
   jumpKeyFilePath: '~/.ssh/id_rsa',
 });
 
-export const loadConnections = (): SshConnectionRecord[] => {
-  const stored = localStorage.getItem(CONNECTIONS_KEY);
-  if (!stored) return [];
-  return dedupeConnections(JSON.parse(stored) as SshConnectionRecord[]);
+export const loadConnections = async (): Promise<SshConnectionRecord[]> => {
+  const result = await window.electron.ipcRenderer.invoke(
+    'ssh:load-connection-records',
+  );
+  if (!result?.success) {
+    throw new Error(result?.error || '读取连接历史失败');
+  }
+
+  return dedupeConnections((result.data || []) as SshConnectionRecord[]);
 };
 
-export const saveConnections = (records: SshConnectionRecord[]) => {
-  localStorage.setItem(
-    CONNECTIONS_KEY,
-    JSON.stringify(dedupeConnections(records)),
+export const saveConnections = async (records: SshConnectionRecord[]) => {
+  const result = await window.electron.ipcRenderer.invoke(
+    'ssh:save-connection-records',
+    dedupeConnections(records),
   );
+  if (!result?.success) {
+    throw new Error(result?.error || '保存连接历史失败');
+  }
 };
 
 export const toFormValues = (

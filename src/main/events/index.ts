@@ -1,4 +1,6 @@
-import { BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
+import fs from 'fs';
+import path from 'path';
 import Debug from './debug';
 import Window from './window';
 import Logs from './logs';
@@ -10,6 +12,28 @@ import AppSwitcher, { IAppSwitcherOptions } from './switch-app';
 import Package from './package';
 import FileManager from './file';
 import NotificationManager from './notification';
+
+const SSH_CONNECTIONS_FILE = 'ssh-connections.json';
+
+const getSshConnectionsFilePath = () =>
+  path.join(app.getPath('userData'), SSH_CONNECTIONS_FILE);
+
+const readSshConnectionRecords = () => {
+  const filePath = getSshConnectionsFilePath();
+  if (!fs.existsSync(filePath)) return [];
+
+  const rawRecords = fs.readFileSync(filePath, 'utf-8');
+  return JSON.parse(rawRecords);
+};
+
+const writeSshConnectionRecords = (records: unknown) => {
+  fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  fs.writeFileSync(
+    getSshConnectionsFilePath(),
+    JSON.stringify(records, null, 2),
+    'utf-8',
+  );
+};
 
 /**
  * 获取或创建与特定窗口关联的类的实例。
@@ -91,6 +115,7 @@ class IPCEventsV2 {
     this.registerPackageEvents();
     IPCEventsV2.registerUpdateEvents();
     IPCEventsV2.registerSSHConnectionLifecycle();
+    IPCEventsV2.registerSSHConnectionRecordEvents();
   }
 
   resetInstances() {
@@ -227,6 +252,31 @@ class IPCEventsV2 {
       success: true,
       data: sshManager.getActiveConnections(),
     }));
+  }
+
+  static registerSSHConnectionRecordEvents() {
+    ipcMain.handle('ssh:load-connection-records', () => {
+      try {
+        return { success: true, data: readSshConnectionRecords() };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : '读取连接历史失败',
+        };
+      }
+    });
+
+    ipcMain.handle('ssh:save-connection-records', (_event, records) => {
+      try {
+        writeSshConnectionRecords(records);
+        return { success: true, data: null };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : '保存连接历史失败',
+        };
+      }
+    });
   }
 
   static registerSSHConnectionLifecycle() {
