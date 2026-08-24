@@ -71,6 +71,13 @@ export default function SshConnections() {
       )
     : records;
   const hostOptions = Array.from(new Set(records.map((record) => record.host)));
+  const jumpHostOptions = Array.from(
+    new Set(
+      records
+        .map((record) => record.jumpHost?.trim())
+        .filter((jumpHost): jumpHost is string => Boolean(jumpHost)),
+    ),
+  );
   const selectedRecord =
     records.find((record) => record.id === selectedRecordId) || null;
   const selectedConnection = selectedRecord
@@ -731,13 +738,14 @@ export default function SshConnections() {
       </section>
 
       {showForm && (
-        <div className="yogo-modal-overlay z-50 grid place-items-center overflow-y-auto bg-slate-950/70 px-6 py-8 backdrop-blur-sm [-webkit-app-region:no-drag] max-sm:px-3 max-sm:py-4">
-          <div className="yogo-panel w-full max-w-3xl rounded-3xl [-webkit-app-region:no-drag]">
+        <div className="yogo-modal-overlay z-50 flex items-center justify-center overflow-hidden bg-slate-950/70 p-6 backdrop-blur-sm [-webkit-app-region:no-drag] max-sm:p-3">
+          <div className="yogo-panel flex max-h-[calc(100vh-var(--yogo-titlebar-safe-height)-3rem)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl [-webkit-app-region:no-drag]">
             <SshConnectionForm
               values={formValues}
               isEditing={Boolean(editingRecord)}
               isConnecting={Boolean(connectingId)}
               hostOptions={hostOptions}
+              jumpHostOptions={jumpHostOptions}
               errors={formErrors}
               onChange={(nextValues) => {
                 setFormValues(nextValues);

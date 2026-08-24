@@ -92,7 +92,7 @@ export interface SSHConnectionClosedEvent {
 
 type SSHConnectionClosedListener = (event: SSHConnectionClosedEvent) => void;
 
-const SSH_CONNECT_TIMEOUT = 10000;
+const SSH_CONNECT_TIMEOUT = 30000;
 const SSH_KEEPALIVE_INTERVAL = 3000;
 const SSH_KEEPALIVE_COUNT_MAX = 10;
 const HEALTH_CHECK_INTERVAL = 3000;
@@ -113,8 +113,9 @@ export class SSHAuthManager {
 
   private static attachPasswordAuthHandler(
     connection: SSH2Client,
-    password: string,
+    password?: string,
   ): void {
+    if (!password) return;
     connection.on(
       'keyboard-interactive',
       (_name, _instructions, _lang, prompts, finish) => {
@@ -210,7 +211,18 @@ export class SSHAuthManager {
     const targetConn = new Client();
     if (!this.trackPendingClient(connectionId, jumpConn)) return;
     if (!this.trackPendingClient(connectionId, targetConn)) return;
-    SSHAuthManager.attachPasswordAuthHandler(targetConn, credentials.password);
+    if (credentials.jumpPassword) {
+      SSHAuthManager.attachPasswordAuthHandler(
+        jumpConn,
+        credentials.jumpPassword,
+      );
+    }
+    if (credentials.password) {
+      SSHAuthManager.attachPasswordAuthHandler(
+        targetConn,
+        credentials.password,
+      );
+    }
 
     jumpConn.on('ready', () => {
       if (this.isAuthenticationCanceled(connectionId)) {
@@ -279,6 +291,7 @@ export class SSHAuthManager {
       host: credentials.jumpHost,
       port: parseInt(credentials.jumpPort || '22', 10),
       username: credentials.jumpUsername,
+      tryKeyboard: true,
       readyTimeout: SSH_CONNECT_TIMEOUT,
       keepaliveInterval: SSH_KEEPALIVE_INTERVAL,
       keepaliveCountMax: SSH_KEEPALIVE_COUNT_MAX,
@@ -301,7 +314,7 @@ export class SSHAuthManager {
       jumpOptions.privateKey = fs.readFileSync(keyPath);
       jumpConn.connect(jumpOptions);
     } catch (error) {
-      resolve(new ErrorResponse(`读取私钥失败: ${error.message}`));
+      resolve(new ErrorResponse(`读取私钥失败: ${(error as Error).message}`));
     }
   }
 
@@ -312,7 +325,9 @@ export class SSHAuthManager {
   ): void {
     const conn = new Client();
     if (!this.trackPendingClient(connectionId, conn)) return;
-    SSHAuthManager.attachPasswordAuthHandler(conn, credentials.password);
+    if (credentials.password) {
+      SSHAuthManager.attachPasswordAuthHandler(conn, credentials.password);
+    }
     conn.on('ready', () => {
       if (this.isAuthenticationCanceled(connectionId)) {
         conn.end();

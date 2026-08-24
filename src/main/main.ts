@@ -3,6 +3,9 @@ import log from 'electron-log';
 import { windowManager, sshManager, updateManager } from './managers';
 import IPCEventsV2 from './events';
 
+// 禁用 Chromium 的自动隐藏悬浮滚动条特性，确保桌面端滚动条常驻
+app.commandLine.appendSwitch('disable-features', 'OverlayScrollbar');
+
 let hasCleanedUp = false;
 
 // 应用退出时的资源清理

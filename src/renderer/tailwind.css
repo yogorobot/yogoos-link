@@ -16,8 +16,6 @@ body {
   overflow: hidden; /* 防止窗口出现滚动条 */
   background: #020617; /* 使用solid背景色而不是透明 */
   --yogo-titlebar-safe-height: 0px;
-  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
-  scrollbar-width: thin;
 }
 
 body.platform-darwin {
@@ -30,40 +28,37 @@ body.platform-darwin {
   /* min-height: 100vh; */
 }
 
-/* 自定义滚动条样式 */
+/* 自定义滚动条样式 - 常驻显示 */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  -webkit-appearance: none;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(15, 23, 42, 0.6);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.42);
+  background: rgba(148, 163, 184, 0.55);
   border-radius: 999px;
+  min-height: 24px;
   transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.62);
-}
-
-* {
-  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
-  scrollbar-width: thin;
+  background: rgba(226, 232, 240, 0.85);
 }
 
 /* 为需要更明显滚动条的区域提供特殊样式类 */
 .scrollbar-visible {
   &::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.5);
+    background: rgba(148, 163, 184, 0.6);
   }
 
   &::-webkit-scrollbar-thumb:hover {
-    background: rgba(203, 213, 225, 0.68);
+    background: rgba(226, 232, 240, 0.85);
   }
 }
 

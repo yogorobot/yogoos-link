@@ -52,27 +52,30 @@ export default function ConnectionSidebar({
     <aside className="yogo-panel flex min-h-0 w-86 flex-1 shrink-0 flex-col rounded-3xl max-[860px]:w-full">
       <header className="border-b border-slate-700/70 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-slate-100">设备</h2>
-          <span className="text-right text-xs text-slate-500">
-            {records.length} 个历史配置
-          </span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-100">设备</h2>
+            <span className="rounded-full bg-slate-800/80 px-2 py-0.5 text-xs text-slate-400">
+              {records.length}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="yogo-button-primary flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-medium transition"
+            aria-label="新建连接"
+            onClick={onCreate}
+          >
+            <span className="text-sm font-bold leading-none">+</span>
+            <span>新建连接</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div>
           <input
-            className="yogo-input min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
+            className="yogo-input w-full rounded-xl px-3 py-2 text-sm"
             placeholder="搜索 host"
             value={searchTerm}
             onChange={(event) => onSearchChange(event.target.value)}
           />
-          <button
-            type="button"
-            className="yogo-button-primary flex h-9 w-9 items-center justify-center rounded-xl text-xl font-light leading-none transition"
-            aria-label="新建连接"
-            onClick={onCreate}
-          >
-            +
-          </button>
         </div>
       </header>
 
