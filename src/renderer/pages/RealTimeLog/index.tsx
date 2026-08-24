@@ -4,12 +4,12 @@ import WindowTitlebar from '../../components/WindowTitlebar';
 import { useLog } from '../../hooks';
 import { FilterOptions } from '../../components/StreamView/LogFilter';
 
-const defaultFilters: FilterOptions = {
-  searchTerm: '[Face]',
+const getDefaultFilters = (fileName?: string): FilterOptions => ({
+  searchTerm: fileName?.includes('macross') ? 'face_log' : '[Face]',
   caseSensitive: true,
   customPattern: '',
   excludeTerms: [],
-};
+});
 
 const getHash = (str: string): string => {
   let hash = 0;
@@ -26,7 +26,9 @@ const Index = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const { getRealtimeLogFile } = useLog();
   const [requestId, setRequestId] = useState<string>(null);
-  const [filters, setFilters] = useState<FilterOptions>(defaultFilters);
+  const [defaultFilters, setDefaultFilters] =
+    useState<FilterOptions>(getDefaultFilters());
+  const [filters, setFilters] = useState<FilterOptions>(getDefaultFilters());
   const [time, setTime] = useState<number>(Date.now());
 
   const onFilterChange = (filter: FilterOptions) => {
@@ -39,7 +41,13 @@ const Index = () => {
       // setIsLoading(true);
       const logs = await getRealtimeLogFile();
       // setIsLoading(false);
-      setSelectedFile(logs[0]);
+      const firstFile = logs?.[0];
+      if (firstFile) {
+        const initialFilters = getDefaultFilters(firstFile.name);
+        setDefaultFilters(initialFilters);
+        setFilters(initialFilters);
+        setSelectedFile(firstFile);
+      }
     };
     fetchLogs();
   }, [getRealtimeLogFile]);

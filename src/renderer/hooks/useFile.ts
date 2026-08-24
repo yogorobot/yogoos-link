@@ -7,17 +7,6 @@ interface OpenDialogOptions {
   properties?: string[];
 }
 
-interface SaveTempFileData {
-  fileName: string;
-  data: number[];
-}
-
-interface SaveTempResult {
-  success: boolean;
-  filePath?: string;
-  error?: string;
-}
-
 export const useFile = () => {
   // 显示文件选择对话框
   const showOpenDialog = useCallback(

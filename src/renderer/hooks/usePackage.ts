@@ -20,3 +20,5 @@ export const usePackage = () => {
     packageClearSingle,
   };
 };
+
+export default usePackage;

@@ -70,39 +70,53 @@ class Logs {
     });
   }
 
-  async getStreamRealtimeFile() {
-    const isExistsMeteorFile = await this.checkLogMeteorFile();
-    const logFile = isExistsMeteorFile
-      ? '/var/run/log/meteor.log'
-      : '/var/log/apps/macross.log';
-
-    const result = await sshManager.executeCommand(
-      this.connectionId,
-      `ls -l ${logFile}`,
-    );
-    console.log(result);
-
-    return formatFileList(result);
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  async getHistoryLogList() {
-    const result = await sshManager.executeCommand(
-      this.connectionId,
-      `ls -l /var/log/meteor-*.gz`,
-    );
-
-    return formatFileList(result);
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  async checkLogMeteorFile() {
+  async detectLogType(): Promise<'meteor' | 'macross'> {
     const checkResult = await sshManager.executeCommand(
       this.connectionId,
-      '[ -f /var/run/log/meteor.log ] && echo "exists" || echo "not exists"',
+      '[ -f /var/run/log/macross.log ] && echo "macross" || echo "meteor"',
     );
+    return checkResult.trim() === 'macross' ? 'macross' : 'meteor';
+  }
 
-    return checkResult.trim() === 'exists';
+  async getStreamRealtimeFile() {
+    try {
+      const logType = await this.detectLogType();
+      const logFile =
+        logType === 'macross'
+          ? '/var/run/log/macross.log'
+          : '/var/run/log/meteor.log';
+
+      const result = await sshManager.executeCommand(
+        this.connectionId,
+        `ls -l ${logFile} 2>/dev/null || true`,
+      );
+      console.log(result);
+
+      return formatFileList(result);
+    } catch (error) {
+      console.error('获取实时日志文件失败:', error);
+      return [];
+    }
+  }
+
+  async getHistoryLogList() {
+    try {
+      const logType = await this.detectLogType();
+      const pattern =
+        logType === 'macross'
+          ? '/var/log/macross-*.gz'
+          : '/var/log/meteor-*.gz';
+
+      const result = await sshManager.executeCommand(
+        this.connectionId,
+        `ls -l ${pattern} 2>/dev/null || true`,
+      );
+
+      return formatFileList(result);
+    } catch (error) {
+      console.error('获取历史日志列表失败:', error);
+      return [];
+    }
   }
 
   async cleanup() {

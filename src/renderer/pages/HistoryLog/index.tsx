@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import StreamView from '../../components/StreamView';
 import WindowTitlebar from '../../components/WindowTitlebar';
 import { useLog } from '../../hooks';
 import { FilterOptions } from '../../components/StreamView/LogFilter';
 
-const defaultFilters: FilterOptions = {
-  searchTerm: '[Face]',
+const getDefaultFilters = (fileName?: string): FilterOptions => ({
+  searchTerm: fileName?.includes('macross') ? 'face_log' : '[Face]',
   caseSensitive: true,
   customPattern: '',
   excludeTerms: [],
-};
+});
 
 const getHash = (str: string): string => {
   let hash = 0;
@@ -29,7 +29,9 @@ const Index = () => {
   const [error, setError] = useState(null);
   const { getHistoryLogList } = useLog();
   const [requestId, setRequestId] = useState<string>(null);
-  const [filters, setFilters] = useState<FilterOptions>(defaultFilters);
+  const [defaultFilters, setDefaultFilters] =
+    useState<FilterOptions>(getDefaultFilters());
+  const [filters, setFilters] = useState<FilterOptions>(getDefaultFilters());
   const [time, setTime] = useState<number>(Date.now());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -44,7 +46,7 @@ const Index = () => {
     setIsSidebarOpen(false);
   };
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -57,10 +59,14 @@ const Index = () => {
         setSelectedFile(null);
       } else {
         setLogList(logs);
-        setSelectedFile(logs[0]);
+        const initialFile = logs[0];
+        const initialFilters = getDefaultFilters(initialFile.name);
+        setDefaultFilters(initialFilters);
+        setFilters(initialFilters);
+        setSelectedFile(initialFile);
         setError(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('获取日志列表失败:', err);
       const errorMsg = err?.message || '获取日志列表失败';
 
@@ -80,12 +86,12 @@ const Index = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getHistoryLogList]);
 
   // 自动加载机制
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [fetchLogs]);
 
   useEffect(() => {
     if (selectedFile?.name) {

@@ -17,6 +17,7 @@ export const useLog = () => {
       );
     } catch (error) {
       console.error('Failed to get realtime log:', error);
+      return null;
     }
   }, []);
 
@@ -25,6 +26,7 @@ export const useLog = () => {
       return await window.electron.ipcRenderer.invoke('log:get-history-list');
     } catch (error) {
       console.error('Failed to get log list:', error);
+      return [];
     }
   }, []);
 
@@ -36,6 +38,7 @@ export const useLog = () => {
       );
     } catch (error) {
       console.error('Failed to get realtime logs:', error);
+      return null;
     }
   }, []);
 
@@ -47,10 +50,11 @@ export const useLog = () => {
       );
     } catch (error) {
       console.error('Failed to get history logs:', error);
+      return null;
     }
   }, []);
 
-  const clearStream = useCallback(async (id) => {
+  const clearStream = useCallback(async (id: string) => {
     try {
       await window.electron.ipcRenderer.invoke('log:clear-stream', id);
     } catch (error) {

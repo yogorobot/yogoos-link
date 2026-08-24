@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 export interface ToastProps {
   message: string;
@@ -16,13 +16,13 @@ const Toast: React.FC<ToastProps> = ({
   const [isVisible, setIsVisible] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsAnimating(false);
     setTimeout(() => {
       setIsVisible(false);
       onClose?.();
     }, 300);
-  };
+  }, [onClose]);
 
   useEffect(() => {
     // 入场动画
@@ -39,7 +39,7 @@ const Toast: React.FC<ToastProps> = ({
       clearTimeout(showTimer);
       clearTimeout(hideTimer);
     };
-  }, [duration]);
+  }, [duration, handleClose]);
 
   if (!isVisible) return null;
 
